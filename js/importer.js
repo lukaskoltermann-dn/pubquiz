@@ -66,8 +66,10 @@ export function linesToQuiz(lines, title = "Neues Quiz") {
       continue;
     }
     if (round && round.music) {
-      const parts = t.split(/\s+[-–]\s+/);
-      if (parts.length >= 2) round.items.push({ id: uid(), type: "music", a: parts[0].trim(), b: parts.slice(1).join(" - ").trim(), note: "" });
+      const link = (t.match(/(https?:\/\/open\.spotify\.com\/\S+|spotify:track:[A-Za-z0-9]+)/) || [""])[0];
+      const parts = t.replace(link, "").trim().split(/\s+[-–]\s+/);
+      if (parts.length >= 2) round.items.push({ id: uid(), type: "music", a: parts[0].trim(), b: parts.slice(1).join(" - ").trim(), spotify: link, start: 0, note: "" });
+      else if (link && round.items.length && !round.items[round.items.length - 1].spotify) round.items[round.items.length - 1].spotify = link;
       continue;
     }
     if (/sch[äa]tzfrage/i.test(t) && !/\?\s*$/.test(t)) { finish(); estimateNext = true; continue; }

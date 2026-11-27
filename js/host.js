@@ -69,7 +69,9 @@ function itemEditor(it, ri, ii) {
   const k = `${ri}-${ii}`;
   const type = `<label>Art<select data-f="type" data-k="${k}">${[["mc", "Multiple Choice"], ["text", "Freie Antwort"], ["estimate", "Schätzfrage (Stechen)"], ["music", "Lied"]].map(([v, l]) => `<option value="${v}" ${it.type === v ? "selected" : ""}>${l}</option>`).join("")}</select></label>`;
   let body = "";
-  if (it.type === "music") body = `<div class="row2"><label>Teil 1 (z. B. Interpret)<input data-f="a" data-k="${k}" value="${esc(it.a)}"></label><label>Teil 2 (z. B. Titel)<input data-f="b" data-k="${k}" value="${esc(it.b)}"></label></div>`;
+  if (it.type === "music") body = `<div class="row2"><label>Teil 1 (z. B. Interpret)<input data-f="a" data-k="${k}" value="${esc(it.a)}"></label><label>Teil 2 (z. B. Titel)<input data-f="b" data-k="${k}" value="${esc(it.b)}"></label></div>
+    <div class="row2"><label style="flex:3 1 260px">Spotify-Link (Song teilen → Link kopieren)<input data-f="spotify" data-k="${k}" value="${esc(it.spotify || "")}" placeholder="https://open.spotify.com/track/…"></label><label style="flex:1 1 110px">Start bei Sekunde<input data-f="start" data-k="${k}" inputmode="numeric" value="${esc(it.start || 0)}"></label></div>
+    ${it.spotify && !trackId(it.spotify) ? `<p class="err">Das ist kein Spotify-Song-Link.</p>` : ""}`;
   else {
     body = `<label>Frage<textarea data-f="text" data-k="${k}">${esc(it.text)}</textarea></label>`;
     if (it.type === "mc") body += `<div class="row2"><label style="flex:3 1 260px">Antworten (eine pro Zeile)<textarea data-f="options" data-k="${k}">${esc((it.options || []).join("\n"))}</textarea></label>
@@ -107,6 +109,7 @@ app.addEventListener("input", e => {
   if (el.dataset.k && el.dataset.f !== "type" && el.dataset.f !== "correct") {
     const [ri, ii] = el.dataset.k.split("-").map(Number), it = editing.rounds[ri].items[ii];
     if (el.dataset.f === "options") it.options = el.value.split("\n").map(s => s.trim()).filter(Boolean);
+    else if (el.dataset.f === "start") it.start = Math.max(0, parseInt(el.value) || 0);
     else if (el.dataset.f === "answer" && it.type === "estimate") it.answer = el.value.trim() === "" ? null : parseFloat(el.value.replace(",", "."));
     else it[el.dataset.f] = el.value;
     autosave();
@@ -214,6 +217,34 @@ async function releaseItem(id, all = false) {
 }
 function itemLabel(r, idx) { const it = r.items[idx]; if (it.type === "estimate") return "Schätzfrage"; const n = r.items.slice(0, idx + 1).filter(x => x.type !== "estimate").length; return it.type === "music" ? `Lied ${n}` : `Frage ${n}`; }
 
+// ---------- Spotify: kurze Ausschnitte abspielen ----------
+const CLIP = 10;
+function trackId(link) { const m = String(link || "").match(/(?:track[\/:])([A-Za-z0-9]{22})/); return m ? m[1] : ""; }
+let spApi = null, spCtl = null, spWant = null, spTimer = null, spSeeked = false, spStarted = 0;
+document.addEventListener("click", e => { if (e.target.id === "spclose") { stopClip(); $("spotbox").hidden = true; } });
+function spMsg(t) { const m = $("spmsg"); if (m) m.textContent = t; }
+function stopClip() { clearTimeout(spTimer); spWant = null; try { spCtl?.pause(); } catch {} spMsg("Gestoppt"); }
+function playClip(it) {
+  const uri = "spotify:track:" + trackId(it.spotify), box = $("spotbox");
+  box.hidden = false; $("sptitle").textContent = `${it.a} – ${it.b}`;
+  spWant = { uri, start: Math.max(0, +it.start || 0) }; spSeeked = false; spStarted = 0; clearTimeout(spTimer);
+  spMsg("Lädt…");
+  spApi ||= window.SpotifyIframeApi;
+  if (!spApi) { spMsg("Spotify-Player lädt noch, gleich nochmal drücken."); return; }
+  if (!spCtl) {
+    spApi.createController($("spframe"), { uri, width: "100%", height: 80 }, c => {
+      spCtl = c;
+      c.addListener("ready", () => { if (spWant) c.play(); });
+      c.addListener("playback_update", e => {
+        const d = e.data || {}; if (!spWant || d.isPaused || d.isBuffering) return;
+        if (!spSeeked) { spSeeked = true; if (spWant.start) { c.seek(spWant.start); return; } }
+        if (!spStarted) { spStarted = Date.now(); spTimer = setTimeout(() => { c.pause(); spWant = null; spMsg(`${CLIP} Sekunden gespielt`); }, CLIP * 1000); }
+        spMsg(`Läuft… noch ${Math.max(0, Math.ceil(CLIP - (Date.now() - spStarted) / 1000))} Sek.`);
+      });
+    });
+  } else { spCtl.loadUri(uri); spCtl.play(); }
+}
+
 // ---------- Aktionen ----------
 async function act(a) {
   const r = curRound(), last = game.roundIdx >= quiz().rounds.length - 1;
@@ -275,7 +306,7 @@ function renderLive() {
 
   const rids = r ? relIds(r) : [], nextId = r?.items.find(it => !rids.includes(it.id))?.id;
   const script = r ? r.items.map((it, i) => { const done = rids.includes(it.id), canRel = ph === "question" && !done;
-    return `<div class="script${done ? " done" : ""}"><div class="row2" style="justify-content:space-between;align-items:flex-start;flex-wrap:nowrap"><span class="qnum">${esc(itemLabel(r, i))}${done ? " · freigegeben ✓" : ""}</span>${canRel ? `<button class="${it.id === nextId ? "main" : ""}" data-rel="${esc(it.id)}" style="flex:none">Freigeben</button>` : ""}</div>${it.type === "music" ? "" : esc(it.text)}${it.type === "mc" ? `<br><span class="hint">${it.options.map((o, k) => `${"abcdefgh"[k]}) ${esc(o)}`).join(" · ")}</span>` : ""}<br><span class="right">${esc(rightText(it))}</span>${it.note ? `<br><span class="hint">${esc(it.note)}</span>` : ""}</div>`; }).join("")
+    return `<div class="script${done ? " done" : ""}"><div class="row2" style="justify-content:space-between;align-items:flex-start;flex-wrap:nowrap"><span class="qnum">${esc(itemLabel(r, i))}${done ? " · freigegeben ✓" : ""}</span>${canRel ? `<button class="${it.id === nextId ? "main" : ""}" data-rel="${esc(it.id)}" style="flex:none">Freigeben</button>` : ""}</div>${it.type === "music" ? `<b>${esc(it.a)} – ${esc(it.b)}</b>${trackId(it.spotify) ? `<div class="row2" style="margin:6px 0"><button class="main" data-play="${esc(it.id)}">▶ ${CLIP} Sek. abspielen</button><button data-stop="1">■ Stopp</button>${it.start ? `<span class="hint">ab Sekunde ${it.start}</span>` : ""}</div>` : `<br><span class="hint">Kein Spotify-Link hinterlegt</span>`}` : esc(it.text)}${it.type === "mc" ? `<br><span class="hint">${it.options.map((o, k) => `${"abcdefgh"[k]}) ${esc(o)}`).join(" · ")}</span>` : ""}<br><span class="right">${esc(rightText(it))}</span>${it.note ? `<br><span class="hint">${esc(it.note)}</span>` : ""}</div>`; }).join("")
     + (ph === "question" ? `<div class="row2"><button class="main" data-a="timer">Antwortzeit starten</button><span class="hint">Dauer wie oben eingestellt</span></div>` : "") : "";
 
   const answered = r ? Object.keys(roundAnswers(r.id)).length : 0;
@@ -318,6 +349,8 @@ app.addEventListener("click", async e => {
   const b = e.target.closest("button"); if (!b) return;
   if (b.dataset.a) { b.disabled = true; await act(b.dataset.a); return; }
   if (b.dataset.v) { view = b.dataset.v; return renderLive(); }
+  if (b.dataset.play) { const it = curRound().items.find(x => x.id === b.dataset.play); if (it) playClip(it); return; }
+  if (b.dataset.stop) { stopClip(); return; }
   if (b.dataset.rel) { b.disabled = true; await releaseItem(b.dataset.rel); return; }
   if (b.dataset.a2 === "suggest") { applySuggestions(true); return renderLive(); }
   if (b.dataset.merge) { const [n, o] = b.dataset.merge.split("|"); b.disabled = true; await mergeTeam(n, o); return; }
