@@ -26,6 +26,10 @@ Teams spielen per Smartphone mit, der Moderator steuert alles vom Laptop, der Be
 6. „Auflösung auf dem Beamer“: Frage für Frage „Lösung aufdecken“, mit Statistik (wie viele Teams richtig lagen, welche Antwort gewählt wurde, Schätzungen auf dem Zahlenstrahl). Danach „Stand auf Beamer zeigen“: die Rangliste fährt vom alten in den neuen Stand, mit Aufsteiger-Pfeilen.
 7. Nach der letzten Runde „Siegerehrung starten“ und Platz für Platz aufdecken. Vor Platz 1 kommt ein Trommelwirbel, dann Fanfare und Konfetti. Gleichstand auf Platz 1 entscheidet die Schätzfrage.
 
+## Generalprobe
+
+Im Quiz-Editor oben „Generalprobe“: prüft alle Bilder automatisch, warnt bei fehlenden Lösungen oder Spotify-Links, und jeder Song lässt sich anspielen (wird dann abgehakt). „Beamer-Vorschau öffnen“ zeigt jede Frage per „Auf Beamer“ genau wie am Abend, inklusive Musik-Countdown. Die Vorschau muss im selben Browser geöffnet werden.
+
 ## Show-Extras
 
 - **Team-Emoji:** Teams wählen beim Beitreten ein Emoji, es steht vor dem Namen.

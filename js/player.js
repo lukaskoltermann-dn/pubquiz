@@ -1,5 +1,5 @@
-import { ready, auth, db, signInAnonymously, onAuthStateChanged, doc, getDoc, setDoc, onSnapshot, $, esc, params, until, hydrate } from "./fb.js?v=20261127f";
-import { confetti } from "./fx.js?v=20261127f";
+import { ready, auth, db, signInAnonymously, onAuthStateChanged, doc, getDoc, setDoc, onSnapshot, $, esc, params, until, hydrate } from "./fb.js?v=20261127g";
+import { confetti } from "./fx.js?v=20261127g";
 
 const app = $("app");
 const LS = "pubquiz-team";

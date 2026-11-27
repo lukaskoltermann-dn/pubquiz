@@ -4,9 +4,9 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Kolties QuizKasten · Moderation</title>
-<script>/* Update-Check: lädt neu, sobald eine neuere Version online ist */const APPV="20261127f";fetch("version.txt?"+Date.now(),{cache:"no-store"}).then(r=>r.ok?r.text():"").then(t=>{t=t.trim();if(t&&t!==APPV){const u=new URL(location.href);if(u.searchParams.get("v")!==t){u.searchParams.set("v",t);location.replace(u)}}}).catch(()=>{});</script>
+<script>/* Update-Check: lädt neu, sobald eine neuere Version online ist */const APPV="20261127g";fetch("version.txt?"+Date.now(),{cache:"no-store"}).then(r=>r.ok?r.text():"").then(t=>{t=t.trim();if(t&&t!==APPV){const u=new URL(location.href);if(u.searchParams.get("v")!==t){u.searchParams.set("v",t);location.replace(u)}}}).catch(()=>{});</script>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bungee&family=Outfit:wght@400;500;600;700&display=swap">
-<link rel="stylesheet" href="css/style.css?v=20261127f">
+<link rel="stylesheet" href="css/style.css?v=20261127g">
 <style>
 .item{display:grid;gap:8px}
 .item .row2>label{flex:1 1 160px}
@@ -27,6 +27,9 @@
 .filebtn input{position:absolute;inset:0;opacity:0;cursor:pointer;min-height:0}
 .thumb{display:block;max-width:220px;max-height:140px;border-radius:10px;margin-top:6px;object-fit:contain;background:#000}
 #fxb[aria-pressed=false]{opacity:.7}
+.pstat{font-size:13px;font-weight:600;text-align:right}
+.script.probe.bad{border-left-color:var(--red)}
+.script.probe.cur{box-shadow:0 0 0 2px var(--gold);opacity:1}
 @media(max-width:600px){.grow{grid-template-columns:minmax(0,1fr) auto}.grow .ans{grid-column:1/-1;grid-row:2}}
 </style>
 </head>
@@ -37,7 +40,7 @@
 <aside id="spotbox" hidden><div class="row2" style="justify-content:space-between;flex-wrap:nowrap"><b id="sptitle" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></b><button id="spclose" aria-label="Player ausblenden" style="min-height:32px;padding:0 10px">✕</button></div><div id="spframe"></div><p class="hint" id="spmsg"></p></aside>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.js"></script>
-<script type="module" src="js/host.js?v=20261127f"></script>
+<script type="module" src="js/host.js?v=20261127g"></script>
 <script>window.onSpotifyIframeApiReady = a => { window.SpotifyIframeApi = a; };</script>
 <script src="https://open.spotify.com/embed/iframe-api/v1" async></script>
 </body>

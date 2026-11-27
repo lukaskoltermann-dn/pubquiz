@@ -1,7 +1,7 @@
-import { ready, auth, db, signInWithEmailAndPassword, signOut, onAuthStateChanged, doc, getDoc, setDoc, updateDoc, deleteDoc, onSnapshot, collection, getDocs, $, esc, keepEmu, until, hydrate } from "./fb.js?v=20261127f";
-import * as fx from "./fx.js?v=20261127f";
-import { docxToQuiz, uid } from "./importer.js?v=20261127f";
-import { slots, counts, suggest, answerText, rightText, roundPoints, total, ranking } from "./scoring.js?v=20261127f";
+import { ready, auth, db, signInWithEmailAndPassword, signOut, onAuthStateChanged, doc, getDoc, setDoc, updateDoc, deleteDoc, onSnapshot, collection, getDocs, $, esc, keepEmu, until, hydrate, imgSrc } from "./fb.js?v=20261127g";
+import * as fx from "./fx.js?v=20261127g";
+import { docxToQuiz, uid } from "./importer.js?v=20261127g";
+import { slots, counts, suggest, answerText, rightText, roundPoints, total, ranking } from "./scoring.js?v=20261127g";
 
 const app = $("app");
 const toast = m => { const t = $("toast"); t.textContent = m; t.style.display = "block"; clearTimeout(toast.t); toast.t = setTimeout(() => t.style.display = "none", 3500); };
@@ -28,7 +28,7 @@ function login(msg = "") {
 
 // ---------- Quiz-Liste ----------
 async function home() {
-  stopLive();
+  stopLive(); probe = null;
   $("topacts").innerHTML = `<button id="out">Abmelden</button>`;
   $("out").onclick = () => signOut(auth);
   const snap = await getDocs(collection(db, "users", user.uid, "quizzes"));
@@ -93,8 +93,10 @@ function itemEditor(it, ri, ii) {
 
 function edit(q) {
   editing = JSON.parse(JSON.stringify(q));
-  $("topacts").innerHTML = `<button id="back">Fertig</button><button class="main" id="startE">Abend starten</button>`;
+  probe = null;
+  $("topacts").innerHTML = `<button id="back">Fertig</button><button id="probeB">Generalprobe</button><button class="main" id="startE">Abend starten</button>`;
   $("back").onclick = async () => { await saveQuiz(editing); home(); };
+  $("probeB").onclick = async () => { await saveQuiz(editing); rehearse(); };
   $("startE").onclick = async () => { await saveQuiz(editing); startGame(editing); };
   renderEditor();
 }
@@ -124,7 +126,7 @@ async function storeImg(blob) {
 }
 function autosave() { clearTimeout(editT); editT = setTimeout(() => saveQuiz(editing).catch(() => toast("Speichern fehlgeschlagen")), 800); }
 app.addEventListener("input", e => {
-  if (!editing || code) return;
+  if (!editing || code || probe) return;
   const el = e.target;
   if (el.id === "qt") { editing.title = el.value; return autosave(); }
   if (el.dataset.rf === "name") { editing.rounds[+el.dataset.r].name = el.value; return autosave(); }
@@ -139,7 +141,7 @@ app.addEventListener("input", e => {
   }
 });
 app.addEventListener("change", async e => {
-  if (!editing || code) return;
+  if (!editing || code || probe) return;
   const el = e.target;
   if (el.dataset.rf === "music") { editing.rounds[+el.dataset.r].music = el.checked; autosave(); return renderEditor(); }
   if (el.dataset.upload && el.files[0]) {
@@ -156,7 +158,7 @@ app.addEventListener("change", async e => {
   }
 });
 app.addEventListener("click", async e => {
-  if (!editing || code) return;
+  if (!editing || code || probe) return;
   const b = e.target.closest("button"); if (!b) return;
   const R = editing.rounds;
   if (b.dataset.additem) { const r = R[+b.dataset.additem]; r.items.push(r.music ? { id: uid(), type: "music", a: "", b: "", note: "" } : { id: uid(), type: "mc", text: "", options: [], correct: -1, answer: "", note: "" }); }
@@ -170,8 +172,90 @@ app.addEventListener("click", async e => {
   autosave(); renderEditor();
 });
 
+// ---------- Generalprobe: Bilder prüfen, Songs anspielen, Beamer-Vorschau ----------
+let probe = null, probeCh = null;
+function probeSend() {
+  if (!probe?.cur) return;
+  const q = editing, [ri, ii] = probe.cur, r = q.rounds[ri], it = r.items[ii];
+  const n = r.items.slice(0, ii + 1).filter(x => x.type !== "estimate").length;
+  const pubIt = publicItem(it, n);
+  const game = { phase: "question", title: q.title, roundIdx: ri, roundCount: q.rounds.length, roundName: r.name, questions: [pubIt], currentId: it.id, teamNames: [],
+    playing: probe.playing && probe.playing.until > Date.now() ? probe.playing : null };
+  probeCh?.postMessage({ game, owner: user.uid });
+}
+function rehearse() {
+  const q = editing;
+  probe = { img: {}, song: {}, cur: null, playing: null };
+  if (!probeCh) { probeCh = new BroadcastChannel("pq-probe"); probeCh.onmessage = e => { if (e.data?.hello) probeSend(); }; }
+  $("topacts").innerHTML = `<button id="probeBack">Zurück zum Editor</button><button class="main" id="startE">Abend starten</button>`;
+  $("probeBack").onclick = () => { stopClip(); edit(editing); };
+  $("startE").onclick = () => { stopClip(); probe = null; startGame(editing); };
+  const all = q.rounds.flatMap((r, ri) => r.items.map((it, ii) => ({ r, ri, it, ii })));
+  app.innerHTML = `<div class="stack">
+    <section class="panel stack"><h2 class="slab big">Generalprobe</h2>
+      <p class="hint">Hier spielst du das Quiz ohne Teams durch. Bilder werden automatisch geprüft, Songs spielst du einzeln an. Mit „Auf Beamer“ siehst du jede Frage in der Beamer-Vorschau.</p>
+      <div class="row2"><a href="${esc(keepEmu("screen.html?preview"))}" target="_blank"><button class="main">Beamer-Vorschau öffnen</button></a><span id="psum" class="hint"></span></div></section>
+    ${q.rounds.map((r, ri) => `<section class="panel stack"><h2 class="slab">Runde ${ri + 1}: ${esc(r.name)}</h2>
+      ${r.items.map((it, ii) => { const k = `${ri}-${ii}`, lab = itemLabel(r, ii);
+        return `<div class="script probe" id="pr-${k}"><div class="row2" style="justify-content:space-between;align-items:flex-start;flex-wrap:nowrap"><span class="qnum">${esc(lab)}</span><span class="row2" style="flex:none"><span class="pstat" id="ps-${k}"></span><button data-pv="${k}">Auf Beamer</button></span></div>
+          ${it.type === "music" ? `<b>${esc(it.a)} – ${esc(it.b)}</b>${it.start ? ` <span class="hint">ab Sekunde ${it.start}</span>` : ""}${trackId(it.spotify) ? `<div class="row2" style="margin:6px 0"><button class="main" data-pplay="${k}">▶ ${CLIP} Sek. abspielen</button><button data-stop="1">■ Stopp</button></div>` : ""}`
+            : `${esc(it.text) || `<span class="err">Kein Fragetext</span>`}${it.type === "mc" ? `<br><span class="hint">${(it.options || []).map((o, j) => `${"abcdefgh"[j]}) ${esc(o)}`).join(" · ")}</span>` : ""}${it.img ? `<img class="thumb" data-img="${esc(it.img)}" alt="Bild">` : ""}`}
+          <br><span class="right">${esc(rightText(it))}</span></div>`; }).join("") || `<p class="hint">Keine Fragen in dieser Runde.</p>`}</section>`).join("")}</div>`;
+  hydrate(app, null, user.uid);
+  // Status je Frage
+  for (const { r, ri, it, ii } of all) {
+    const k = `${ri}-${ii}`, st = $("ps-" + k), warn = [];
+    if (it.type === "mc" && !(it.correct >= 0)) warn.push("keine richtige Antwort markiert");
+    if ((it.type === "text") && !String(it.answer ?? "").trim()) warn.push("keine Lösung eingetragen");
+    if (it.type === "estimate" && (it.answer === null || it.answer === undefined || it.answer === "")) warn.push("keine Lösung eingetragen");
+    if (it.type === "music") { probe.song[k] = trackId(it.spotify) ? "open" : "none"; if (!trackId(it.spotify)) warn.push("kein Spotify-Link"); }
+    if (it.img && it.type !== "music") { probe.img[k] = "wait"; checkImg(k, it.img); }
+    st.dataset.warn = warn.join(", ");
+    probeStat(k);
+  }
+  probeSum();
+}
+async function checkImg(k, ref) {
+  const src = await imgSrc(null, ref, user.uid);
+  const ok = src && await new Promise(res => { const im = new Image(); im.onload = () => res(im.naturalWidth > 0); im.onerror = () => res(false); im.src = src; });
+  if (!probe) return;
+  probe.img[k] = ok ? "ok" : "bad"; probeStat(k); probeSum();
+}
+function probeStat(k) {
+  const st = $("ps-" + k); if (!st || !probe) return;
+  const parts = [];
+  if (st.dataset.warn) parts.push(`<span class="err">⚠ ${esc(st.dataset.warn)}</span>`);
+  const im = probe.img[k], so = probe.song[k];
+  if (im) parts.push(im === "ok" ? `<span class="okc">✓ Bild lädt</span>` : im === "bad" ? `<span class="err">✕ Bild lädt nicht</span>` : `<span class="hint">Bild wird geprüft…</span>`);
+  if (so === "open") parts.push(`<span class="hint">noch nicht angespielt</span>`);
+  if (so === "played") parts.push(`<span class="okc">✓ Song läuft</span>`);
+  if (!parts.length) parts.push(`<span class="okc">✓</span>`);
+  st.innerHTML = parts.join(" · ");
+  $("pr-" + k)?.classList.toggle("bad", !!st.dataset.warn || im === "bad");
+}
+function probeSum() {
+  const el = $("psum"); if (!el || !probe) return;
+  const iv = Object.values(probe.img), sv = Object.values(probe.song);
+  const warns = [...app.querySelectorAll(".pstat")].filter(x => x.dataset.warn).length;
+  el.innerHTML = [`Bilder: ${iv.filter(v => v === "ok").length} von ${iv.length} laden${iv.some(v => v === "bad") ? ` <span class="err">(${iv.filter(v => v === "bad").length} kaputt)</span>` : ""}`,
+    `Songs: ${sv.filter(v => v === "played").length} von ${sv.length} angespielt`, warns ? `<span class="err">${warns} ${warns === 1 ? "Frage" : "Fragen"} mit Hinweis</span>` : `<span class="okc">keine fehlenden Lösungen</span>`].join(" · ");
+}
+app.addEventListener("click", e => {
+  if (!probe) return;
+  const b = e.target.closest("button"); if (!b) return;
+  const k = b.dataset.pv || b.dataset.pplay;
+  if (b.dataset.stop) { stopClip(); return; }
+  if (!k) return;
+  const [ri, ii] = k.split("-").map(Number);
+  probe.cur = [ri, ii]; probe.playing = null;
+  app.querySelectorAll(".probe.cur").forEach(x => x.classList.remove("cur")); $("pr-" + k)?.classList.add("cur");
+  if (b.dataset.pplay) { probe.playKey = k; playClip(editing.rounds[ri].items[ii]); }
+  probeSend();
+});
+
 // ---------- Abend starten ----------
 async function startGame(q) {
+  probe = null;
   const A = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
   let c = "";
   for (let i = 0; i < 10; i++) { c = Array.from({ length: 5 }, () => A[Math.floor(Math.random() * A.length)]).join(""); if (!(await getDoc(doc(db, "games", c))).exists()) break; }
@@ -304,6 +388,12 @@ function spMsg(t) { const m = $("spmsg"); if (m) m.textContent = t; }
 function stopClip() { clearTimeout(spTimer); spWant = null; try { spCtl?.pause(); } catch {} spMsg("Gestoppt"); if (code && game?.playing) pub({ playing: null }); }
 // Beamer: Countdown und Musik-Animation
 function onAir(want) {
+  if (probe && probe.playKey) {
+    probe.song[probe.playKey] = "played"; probeStat(probe.playKey); probeSum();
+    const [ri, ii] = probe.playKey.split("-").map(Number);
+    probe.playing = { id: want.id, n: editing.rounds[ri].items.slice(0, ii + 1).filter(x => x.type !== "estimate").length, until: Date.now() + CLIP * 1000 };
+    probeSend();
+  }
   if (!code || !game) return;
   const r = curRound(), i = r ? r.items.findIndex(x => x.id === want.id) : -1;
   const n = i >= 0 ? r.items.slice(0, i + 1).filter(x => x.type !== "estimate").length : 0;

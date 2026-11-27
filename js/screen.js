@@ -1,8 +1,8 @@
-import { ready, auth, db, signInAnonymously, onAuthStateChanged, doc, onSnapshot, $, esc, params, until, hydrate } from "./fb.js?v=20261127f";
-import { confetti } from "./fx.js?v=20261127f";
+import { ready, auth, db, signInAnonymously, onAuthStateChanged, doc, onSnapshot, $, esc, params, until, hydrate } from "./fb.js?v=20261127g";
+import { confetti } from "./fx.js?v=20261127g";
 
 const s = $("s"), code = (params.get("g") || "").toUpperCase();
-let game = null, tick = null, animKey = "", solKey = "", partyKey = "";
+let owner = null, game = null, tick = null, animKey = "", solKey = "", partyKey = "";
 const join = location.origin + location.pathname.replace(/screen\.html$/, "") + `?g=${code}`;
 const qrSvg = () => { try { const q = qrcode(0, "M"); q.addData(join); q.make(); return q.createSvgTag({ cellSize: 6, margin: 0 }); } catch { return ""; } };
 
@@ -45,7 +45,7 @@ function render() {
     else if (q.type === "music") body = `<div class="q"><div class="lab">Lied ${q.n}</div><div class="txt">Ohren auf: Interpret und Titel?</div></div>`;
     else body = `<div class="q${q.img ? " hasimg" : ""}"><div class="qt"><div class="lab">${q.type === "estimate" ? "Schätzfrage" : `Frage ${q.n}`}</div><div class="txt">${esc(q.text)}</div>${q.type === "mc" ? `<div class="op">${q.options.map((o, k) => `<div><b>${"abcdefgh"[k]}</b>${esc(o)}</div>`).join("")}</div>` : ""}</div>${q.img ? `<img class="qimg" data-img="${esc(q.img)}" alt="Bild zur Frage">` : ""}</div>`;
     s.innerHTML = head(rsub) + body;
-    hydrate(s, code);
+    hydrate(s, code, owner);
     if (ph === "answering") { const upd = () => { const l = g.deadline - Date.now(), hot = l > 0 && l <= 10000; $("aq").classList.toggle("last10", hot); $("tm").textContent = hot ? Math.ceil(l / 1000) : l > 0 ? until(l) : "Zeit ist um!"; $("aq").classList.toggle("over", l <= 0 && !!g.deadline); }; upd(); tick = setInterval(upd, 100); }
     return;
   }
@@ -88,7 +88,7 @@ function solve(g, header) {
   else body = so.shown ? `<div class="big-ans">${esc(so.answer)}</div>` : `<div class="rn">Was meint ihr?</div>`;
   const okLine = so.shown && so.type !== "estimate" && so.type !== "music" ? `<div class="stats"><div><span>Richtig</span><span class="meter"><i style="--w:${pct(so.ok, so.of)}%"></i></span><b>${so.ok} von ${so.of}</b></div></div>` : "";
   s.innerHTML = header + `<div class="q solve${so.img ? " hasimg" : ""}${fresh ? " fresh" : ""}"><div class="qt"><div class="lab">Auflösung · ${esc(so.label || "")}</div>${so.text ? `<div class="txt">${esc(so.text)}</div>` : ""}${body}${okLine}</div>${so.img ? `<img class="qimg" data-img="${esc(so.img)}" alt="Bild zur Frage">` : ""}</div>`;
-  hydrate(s, code);
+  hydrate(s, code, owner);
   // Balken wachsen lassen
   const bars = s.querySelectorAll(".bar,.meter i,.pin,.truth");
   if (fresh) { bars.forEach(b => b.classList.add("pre")); requestAnimationFrame(() => requestAnimationFrame(() => bars.forEach(b => b.classList.remove("pre")))); }
@@ -108,7 +108,14 @@ function numberLine(so) {
     <div class="rn">${so.shown ? `Am nächsten dran: <b>${esc(gs.filter(t => Math.abs(t.v - so.answer) === best).map(t => t.name).join(", "))}</b>` : `${gs.length} Schätzungen. Wo liegt die Lösung?`}</div>`;
 }
 
-if (!code) s.innerHTML = `<p>Kein Spiel-Code in der Adresse.</p>`;
+// Beamer-Vorschau für die Generalprobe: Daten kommen direkt aus dem Moderations-Fenster
+if (params.has("preview")) {
+  s.innerHTML = `<div class="q"><div class="lab">Beamer-Vorschau</div><div class="txt">Wähle in der Generalprobe eine Frage aus.</div></div>`;
+  const ch = new BroadcastChannel("pq-probe");
+  ch.onmessage = e => { if (!e.data?.game) return; owner = e.data.owner || null; game = e.data.game; render(); };
+  ch.postMessage({ hello: true });
+}
+else if (!code) s.innerHTML = `<p>Kein Spiel-Code in der Adresse.</p>`;
 else if (!ready) s.innerHTML = `<p>Die App ist noch nicht mit Firebase verbunden.</p>`;
 else onAuthStateChanged(auth, u => {
   if (!u) { signInAnonymously(auth).catch(() => s.innerHTML = "<p>Keine Verbindung.</p>"); return; }
