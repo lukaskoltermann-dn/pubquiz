@@ -1,20 +1,28 @@
-import { ready, auth, db, signInAnonymously, onAuthStateChanged, doc, onSnapshot, $, esc, params, until, hydrate } from "./fb.js?v=20261127j";
-import { confetti } from "./fx.js?v=20261127j";
+import { ready, auth, db, signInAnonymously, onAuthStateChanged, doc, onSnapshot, $, esc, params, until, hydrate } from "./fb.js?v=20261127l";
+import { confetti } from "./fx.js?v=20261127l";
 
 const s = $("s"), code = (params.get("g") || "").toUpperCase();
 let owner = null, game = null, tick = null, animKey = "", solKey = "", partyKey = "";
 const join = location.origin + location.pathname.replace(/screen\.html$/, "") + `?g=${code}`;
 const qrSvg = () => { try { const q = qrcode(0, "M"); q.addData(join); q.make(); return q.createSvgTag({ cellSize: 6, margin: 0 }); } catch { return ""; } };
 
-function render() {
+// Passt der Inhalt nicht auf die Bühne (viele Teams, lange Fragen), wird er etwas verkleinert
+function fit() {
+  const c = [...s.children].find(x => !x.classList.contains("hd") && !x.classList.contains("drumov")); if (!c) return;
+  c.style.zoom = ""; let z = 1;
+  while (s.scrollHeight > s.clientHeight + 1 && z > .5) { z -= .05; c.style.zoom = z; }
+}
+function render() { draw(); fit(); }
+s.addEventListener("load", () => fit(), true);
+function draw() {
   clearInterval(tick);
   const g = game, ph = g.phase;
   const logo = big => `<div class="logo${big ? " big" : ""}" role="img" aria-label="Kolties QuizKasten"><div class="in"><span class="l1">Kolties</span><span class="l2">QuizKasten</span></div></div>`;
   const head = (sub = "") => `<div class="hd"><div class="row2" style="gap:24px">${logo(false)}${sub ? `<div class="rn">${sub}</div>` : ""}</div>${ph !== "lobby" && ph !== "final" ? `<div class="qr mini">${qrSvg()}</div>` : ""}</div>`;
   const pic = cls => `<img class="host-pic ${cls}" src="img/kolti.webp" alt="Quizmaster Kolti">`;
   if (ph === "lobby") {
-    s.innerHTML = `<div class="lobby"><div class="stack" style="gap:clamp(20px,3vw,44px)"><div>${logo(true)}</div>${g.title ? `<div class="rn">${esc(g.title)}</div>` : ""}
-      <div class="join"><div class="qr">${qrSvg()}</div><div><p style="font-size:clamp(18px,2vw,30px);margin:0;font-weight:600">QR-Code scannen oder Code eingeben:</p><div class="code">${esc(code)}</div><p class="url">${esc(join)}</p></div></div>
+    s.innerHTML = `<div class="lobby"><div class="stack" style="gap:44px"><div>${logo(true)}</div>${g.title ? `<div class="rn">${esc(g.title)}</div>` : ""}
+      <div class="join"><div class="qr">${qrSvg()}</div><div><p style="font-size:30px;margin:0;font-weight:600">QR-Code scannen oder Code eingeben:</p><div class="code">${esc(code)}</div><p class="url">${esc(join)}</p></div></div>
       <div><div class="names">${(g.teamNames || []).map(n => `<span>${esc(n)}</span>`).join("")}</div>${(g.teamNames || []).length ? `<p class="rn">${g.teamNames.length} ${g.teamNames.length === 1 ? "Team ist" : "Teams sind"} dabei</p>` : `<p class="rn">Wer traut sich als Erstes?</p>`}</div></div>
       <div class="stage spot">${pic("")}</div></div>`;
     return;
