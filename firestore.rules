@@ -1,0 +1,53 @@
+rules_version = '2';
+// Regeln für die Pubquiz-App. In der Firebase-Konsole unter Firestore → Regeln einfügen und veröffentlichen.
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() { return request.auth != null; }
+    function isHost() { return signedIn() && request.auth.token.firebase.sign_in_provider != 'anonymous'; }
+    function game(code) { return get(/databases/$(database)/documents/games/$(code)).data; }
+    function ownsGame(code) { return signedIn() && game(code).ownerUid == request.auth.uid; }
+
+    // Quizze des Moderators: nur er selbst
+    match /users/{uid}/{rest=**} {
+      allow read, write: if isHost() && request.auth.uid == uid;
+    }
+
+    match /games/{code} {
+      allow read: if signedIn();
+      allow create: if isHost() && request.resource.data.ownerUid == request.auth.uid;
+      allow update: if signedIn() && resource.data.ownerUid == request.auth.uid
+                    && request.resource.data.ownerUid == request.auth.uid;
+      allow delete: if signedIn() && resource.data.ownerUid == request.auth.uid;
+
+      // Lösungen und Punkte: nur der Moderator
+      match /host/{docId} {
+        allow read, write: if ownsGame(code);
+      }
+
+      // Teams melden sich selbst an
+      match /teams/{teamId} {
+        allow read: if signedIn() && (request.auth.uid == teamId || ownsGame(code));
+        allow create, update: if signedIn() && request.auth.uid == teamId
+          && request.resource.data.keys().hasOnly(['name', 'at'])
+          && request.resource.data.name is string
+          && request.resource.data.name.size() > 0 && request.resource.data.name.size() <= 40
+          && game(code).phase != 'final';
+        allow delete: if ownsGame(code);
+      }
+
+      // Antworten: jedes Team nur die eigenen, nur solange die Runde offen ist
+      match /answers/{answerId} {
+        allow read: if signedIn() && (ownsGame(code) || resource.data.uid == request.auth.uid);
+        allow create, update: if signedIn()
+          && request.resource.data.uid == request.auth.uid
+          && answerId == request.resource.data.round + '_' + request.auth.uid
+          && request.resource.data.keys().hasOnly(['uid', 'round', 'a', 'at'])
+          && exists(/databases/$(database)/documents/games/$(code)/teams/$(request.auth.uid))
+          && game(code).roundId == request.resource.data.round
+          && game(code).phase in ['question', 'answering']
+          && (game(code).deadline == 0 || request.time.toMillis() < game(code).deadline + 5000);
+        allow delete: if ownsGame(code);
+      }
+    }
+  }
+}
