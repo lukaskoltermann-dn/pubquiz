@@ -1,4 +1,4 @@
-import { ready, auth, db, signInAnonymously, onAuthStateChanged, doc, getDoc, setDoc, onSnapshot, $, esc, params, until } from "./fb.js?v=20261127b";
+import { ready, auth, db, signInAnonymously, onAuthStateChanged, doc, getDoc, setDoc, onSnapshot, $, esc, params, until } from "./fb.js?v=20261127c";
 
 const app = $("app");
 const LS = "pubquiz-team";

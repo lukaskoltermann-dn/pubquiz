@@ -1,6 +1,6 @@
-import { ready, auth, db, signInWithEmailAndPassword, signOut, onAuthStateChanged, doc, getDoc, setDoc, updateDoc, deleteDoc, onSnapshot, collection, getDocs, $, esc, keepEmu, until } from "./fb.js?v=20261127b";
-import { docxToQuiz, uid } from "./importer.js?v=20261127b";
-import { slots, counts, suggest, answerText, rightText, roundPoints, total, ranking } from "./scoring.js?v=20261127b";
+import { ready, auth, db, signInWithEmailAndPassword, signOut, onAuthStateChanged, doc, getDoc, setDoc, updateDoc, deleteDoc, onSnapshot, collection, getDocs, $, esc, keepEmu, until } from "./fb.js?v=20261127c";
+import { docxToQuiz, uid } from "./importer.js?v=20261127c";
+import { slots, counts, suggest, answerText, rightText, roundPoints, total, ranking } from "./scoring.js?v=20261127c";
 
 const app = $("app");
 const toast = m => { const t = $("toast"); t.textContent = m; t.style.display = "block"; clearTimeout(toast.t); toast.t = setTimeout(() => t.style.display = "none", 3500); };
@@ -223,11 +223,19 @@ function trackId(link) { const m = String(link || "").match(/(?:track[\/:])([A-Z
 let spApi = null, spCtl = null, spWant = null, spTimer = null, spSeeked = false, spStarted = 0;
 document.addEventListener("click", e => { if (e.target.id === "spclose") { stopClip(); $("spotbox").hidden = true; } });
 function spMsg(t) { const m = $("spmsg"); if (m) m.textContent = t; }
-function stopClip() { clearTimeout(spTimer); spWant = null; try { spCtl?.pause(); } catch {} spMsg("Gestoppt"); }
+function stopClip() { clearTimeout(spTimer); spWant = null; try { spCtl?.pause(); } catch {} spMsg("Gestoppt"); if (code && game?.playing) pub({ playing: null }); }
+// Beamer: Countdown und Musik-Animation
+function onAir(want) {
+  if (!code || !game) return;
+  const r = curRound(), i = r ? r.items.findIndex(x => x.id === want.id) : -1;
+  const n = i >= 0 ? r.items.slice(0, i + 1).filter(x => x.type !== "estimate").length : 0;
+  pub({ playing: { id: want.id, n, until: Date.now() + CLIP * 1000 } });
+}
 function playClip(it) {
   const uri = "spotify:track:" + trackId(it.spotify), box = $("spotbox");
   box.hidden = false; $("sptitle").textContent = `${it.a} – ${it.b}`;
-  spWant = { uri, start: Math.max(0, +it.start || 0) }; spSeeked = false; spStarted = 0; clearTimeout(spTimer);
+  spWant = { uri, id: it.id, start: Math.max(0, +it.start || 0) }; spSeeked = false; spStarted = 0; clearTimeout(spTimer);
+  if (code && game?.phase === "question" && !relIds(curRound()).includes(it.id)) releaseItem(it.id);
   spMsg("Lädt…");
   spApi ||= window.SpotifyIframeApi;
   if (!spApi) { spMsg("Spotify-Player lädt noch, gleich nochmal drücken."); return; }
@@ -238,7 +246,7 @@ function playClip(it) {
       c.addListener("playback_update", e => {
         const d = e.data || {}; if (!spWant || d.isPaused || d.isBuffering) return;
         if (!spSeeked) { spSeeked = true; if (spWant.start) { c.seek(spWant.start); return; } }
-        if (!spStarted) { spStarted = Date.now(); spTimer = setTimeout(() => { c.pause(); spWant = null; spMsg(`${CLIP} Sekunden gespielt`); }, CLIP * 1000); }
+        if (!spStarted) { spStarted = Date.now(); onAir(spWant); spTimer = setTimeout(() => { c.pause(); spWant = null; spMsg(`${CLIP} Sekunden gespielt`); if (code) pub({ playing: null }); }, CLIP * 1000); }
         spMsg(`Läuft… noch ${Math.max(0, Math.ceil(CLIP - (Date.now() - spStarted) / 1000))} Sek.`);
       });
     });
@@ -251,7 +259,7 @@ async function act(a) {
   if (a === "startRound" || a === "nextRound") {
     const i = a === "startRound" ? 0 : game.roundIdx + 1, nr = quiz().rounds[i];
     hs.relIds = []; saveHs();
-    await pub({ phase: "question", roundIdx: i, roundId: nr.id, roundName: nr.name, questions: [], currentId: "", deadline: 0 });
+    await pub({ phase: "question", roundIdx: i, roundId: nr.id, roundName: nr.name, questions: [], currentId: "", deadline: 0, playing: null });
   }
   if (a === "release") { const next = r.items.find(it => !relIds(r).includes(it.id)); if (next) await releaseItem(next.id); }
   if (a === "releaseAll") await releaseItem(null, true);

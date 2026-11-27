@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Kolties QuizKasten · Beamer</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bungee&family=Outfit:wght@400;500;600;700&display=swap">
-<link rel="stylesheet" href="css/style.css?v=20261127b">
+<link rel="stylesheet" href="css/style.css?v=20261127c">
 <style>
 html,body{height:100%}
 #s{min-height:100%;display:flex;flex-direction:column;padding:clamp(16px,3vw,48px);gap:clamp(12px,2vw,28px);position:relative;overflow:hidden}
@@ -31,6 +31,18 @@ html,body{height:100%}
 .q .op b{font-family:Bungee,sans-serif;font-weight:400;color:var(--gold);margin-right:12px}
 .tm{font:400 clamp(60px,11vw,170px)/1 Bungee,sans-serif;color:var(--gold);text-shadow:0 0 30px rgba(255,170,40,.6);font-variant-numeric:tabular-nums}
 .mini{width:clamp(90px,9vw,150px)}
+.onair{flex:1;display:grid;justify-items:center;align-content:center;gap:clamp(10px,2.2vh,28px);text-align:center}
+.onair .lab{font:400 clamp(24px,3vw,46px)/1 Bungee,sans-serif;color:var(--gold)}
+.ring{position:relative;width:clamp(150px,min(24vw,36vh),340px);aspect-ratio:1}
+.ring svg{width:100%;height:100%;transform:rotate(-90deg);overflow:visible}
+.ring circle{fill:none;stroke-width:10}
+.ring .bg{stroke:rgba(255,255,255,.12)}
+.ring .fg{stroke:var(--gold);stroke-linecap:round}
+.ring span{position:absolute;inset:0;display:grid;place-items:center;font:400 clamp(56px,min(10vw,15vh),150px)/1 Bungee,sans-serif;color:#fff;text-shadow:0 0 24px rgba(255,170,40,.7)}
+.eq{display:flex;align-items:flex-end;gap:clamp(4px,.6vw,9px);height:clamp(50px,10vh,130px)}
+.eq i{display:block;width:clamp(8px,1.1vw,16px);height:100%;border-radius:6px 6px 2px 2px;background:linear-gradient(0deg,#ff8a00,#ffd45a 60%,#fff6c8);transform-origin:bottom;animation:eq .8s ease-in-out infinite alternate;box-shadow:0 0 12px rgba(255,170,40,.5)}
+@keyframes eq{0%{transform:scaleY(.12)}50%{transform:scaleY(.85)}100%{transform:scaleY(.35)}}
+@media(prefers-reduced-motion:reduce){.eq i{animation:none;transform:scaleY(.5)}}
 .corner{position:absolute;right:clamp(10px,2vw,40px);bottom:0;height:min(46vh,420px);pointer-events:none}
 #s ol{list-style:none;margin:0;padding:0;display:grid;gap:clamp(6px,1vw,14px);max-width:1300px;width:100%}
 #s li{display:grid;grid-template-columns:clamp(54px,7vw,110px) minmax(0,1fr) auto;align-items:center;gap:20px;background:rgba(12,24,68,.85);border:1px solid var(--line);border-radius:18px;padding:clamp(8px,1.1vw,16px) clamp(12px,2vw,28px);font-size:clamp(20px,2.8vw,42px);transition:opacity .7s,transform .7s}
@@ -46,6 +58,6 @@ html,body{height:100%}
 <body>
 <div id="s"><p>Wird geladen…</p></div>
 <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.js"></script>
-<script type="module" src="js/screen.js?v=20261127b"></script>
+<script type="module" src="js/screen.js?v=20261127c"></script>
 </body>
 </html>

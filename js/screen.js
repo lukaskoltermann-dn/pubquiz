@@ -1,4 +1,4 @@
-import { ready, auth, db, signInAnonymously, onAuthStateChanged, doc, onSnapshot, $, esc, params, until } from "./fb.js?v=20261127b";
+import { ready, auth, db, signInAnonymously, onAuthStateChanged, doc, onSnapshot, $, esc, params, until } from "./fb.js?v=20261127c";
 
 const s = $("s"), code = (params.get("g") || "").toUpperCase();
 let game = null, tick = null;
@@ -19,6 +19,18 @@ function render() {
     return;
   }
   const rsub = g.roundIdx >= 0 ? `Runde ${g.roundIdx + 1} von ${g.roundCount}: ${esc(g.roundName)}` : "";
+  const pl = g.playing;
+  if (ph === "question" && pl && pl.until > Date.now()) {
+    const bars = Array.from({ length: 28 }, (_, i) => `<i style="animation-delay:${(-((i * 37) % 100) / 100).toFixed(2)}s;animation-duration:${(0.55 + ((i * 13) % 7) / 10).toFixed(2)}s"></i>`).join("");
+    s.innerHTML = head(`Runde ${g.roundIdx + 1} von ${g.roundCount}: ${esc(g.roundName)}`) + `<div class="onair"><div class="lab">Lied ${pl.n}</div>
+      <div class="ring"><svg viewBox="0 0 120 120" aria-hidden="true"><circle cx="60" cy="60" r="54" class="bg"/><circle cx="60" cy="60" r="54" class="fg" id="arc"/></svg><span id="cd"></span></div>
+      <div class="eq" aria-hidden="true">${bars}</div><div class="rn">Musik läuft: Interpret und Titel?</div></div>`;
+    const total = 10000, arc = $("arc"), C = 2 * Math.PI * 54;
+    arc.style.strokeDasharray = C;
+    const upd = () => { const l = pl.until - Date.now(); if (l <= 0) { clearInterval(tick); render(); return; } $("cd").textContent = Math.ceil(l / 1000); arc.style.strokeDashoffset = C * (1 - Math.min(1, l / total)); };
+    upd(); tick = setInterval(upd, 100);
+    return;
+  }
   if (ph === "question" || ph === "answering" || ph === "locked") {
     const qs = g.questions || [], q = qs.find(x => x.id === g.currentId) || qs[qs.length - 1];
     let body = "";
