@@ -4,9 +4,9 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Kolties QuizKasten · Beamer</title>
-<script>/* Update-Check: lädt neu, sobald eine neuere Version online ist */const APPV="20261127e";fetch("version.txt?"+Date.now(),{cache:"no-store"}).then(r=>r.ok?r.text():"").then(t=>{t=t.trim();if(t&&t!==APPV){const u=new URL(location.href);if(u.searchParams.get("v")!==t){u.searchParams.set("v",t);location.replace(u)}}}).catch(()=>{});</script>
+<script>/* Update-Check: lädt neu, sobald eine neuere Version online ist */const APPV="20261127f";fetch("version.txt?"+Date.now(),{cache:"no-store"}).then(r=>r.ok?r.text():"").then(t=>{t=t.trim();if(t&&t!==APPV){const u=new URL(location.href);if(u.searchParams.get("v")!==t){u.searchParams.set("v",t);location.replace(u)}}}).catch(()=>{});</script>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bungee&family=Outfit:wght@400;500;600;700&display=swap">
-<link rel="stylesheet" href="css/style.css?v=20261127e">
+<link rel="stylesheet" href="css/style.css?v=20261127f">
 <style>
 html,body{height:100%}
 #s{min-height:100%;display:flex;flex-direction:column;padding:clamp(16px,3vw,48px);gap:clamp(12px,2vw,28px);position:relative;overflow:hidden}
@@ -53,12 +53,75 @@ html,body{height:100%}
 .withpic{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:clamp(16px,3vw,50px);align-items:end;flex:1}
 .withpic img{max-height:min(70vh,640px);width:auto}
 .withpic ol{align-self:center}
-@media(max-width:800px){.lobby,.withpic{grid-template-columns:minmax(0,1fr)}.lobby .join{grid-template-columns:minmax(0,1fr)}.stage img,.withpic img{max-height:40vh}.q .op{grid-template-columns:minmax(0,1fr)}.corner{display:none}}
+/* Antwortzeit: Abgabe-Zähler, letzte 10 Sekunden */
+.got{display:grid;gap:10px}
+.dots{display:flex;flex-wrap:wrap;gap:10px}
+.dots i{width:clamp(18px,2vw,30px);aspect-ratio:1;border-radius:50%;background:rgba(255,255,255,.12);border:2px solid rgba(255,255,255,.25);transition:background .4s,box-shadow .4s}
+.dots i.on{background:var(--ok);border-color:#b8ffd6;box-shadow:0 0 16px rgba(97,229,154,.7);animation:pop .4s ease-out}
+.got b{color:var(--ink)}
+.q.last10 .tm{font-size:clamp(140px,30vh,340px);color:#fff;text-shadow:0 0 40px rgba(255,79,79,.9),0 0 10px #ff4f4f;animation:beat 1s ease-out infinite}
+.q.last10 .lab{color:var(--red)}
+.q.over .tm{color:var(--red);font-size:clamp(60px,9vw,150px)}
+@keyframes beat{0%{transform:scale(1.18)}35%{transform:scale(1)}}
+#aq{align-items:center;text-align:center;margin:0 auto}
+#aq .dots{justify-content:center}
+.q.solve{gap:clamp(10px,1.6vh,22px)}
+.q.solve .qt{gap:clamp(10px,1.6vh,22px)}
+.q.solve .txt{font-size:clamp(24px,min(3.4vw,6vh),54px)}
+.q.solve .op div{padding:clamp(8px,1.4vh,18px) clamp(10px,1.4vw,22px)}
+.q.solve .qimg{max-height:58vh}
+/* Frage mit Bild */
+.q.hasimg{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:clamp(16px,3vw,50px);align-items:center;max-width:none}
+.q .qt{display:grid;gap:clamp(14px,2vw,30px)}
+.q .qimg{max-width:100%;max-height:66vh;justify-self:center;border-radius:20px;box-shadow:0 0 0 4px rgba(255,194,58,.6),0 20px 50px rgba(0,0,0,.5);background:#000}
+.q.hasimg .op{grid-template-columns:minmax(0,1fr)}
+/* Auflösung */
+.op.sol div{position:relative;overflow:hidden;display:flex;align-items:center;gap:0;transition:opacity .6s,border-color .6s,box-shadow .6s}
+.op.sol .bar{position:absolute;inset:0 auto 0 0;width:var(--w);background:rgba(255,255,255,.1);transition:width 1.2s cubic-bezier(.2,.8,.2,1) .2s;z-index:0}
+.op.sol .ot,.op.sol b,.op.sol .cnt{position:relative;z-index:1}
+.op.sol .ot{flex:1}
+.op.sol .cnt{font:400 clamp(20px,2.4vw,38px)/1 Bungee,sans-serif;margin-left:12px}
+.op.sol .right{border-color:var(--ok);box-shadow:0 0 0 3px var(--ok),0 0 40px rgba(97,229,154,.55);background:rgba(20,80,50,.9)}
+.op.sol .right .bar{background:rgba(97,229,154,.35)}
+.op.sol .wrong{opacity:.55}
+.big-ans{font:400 clamp(34px,5.5vw,90px)/1.1 Bungee,sans-serif;color:var(--ok);text-shadow:0 0 30px rgba(97,229,154,.5);animation:pop .6s cubic-bezier(.2,1.4,.4,1)}
+.stats{display:grid;gap:12px;max-width:900px}
+.stats div{display:grid;grid-template-columns:clamp(100px,11vw,170px) minmax(0,1fr) auto;gap:16px;align-items:center;font-size:clamp(18px,2vw,30px);font-weight:600}
+.meter{height:clamp(16px,2vh,26px);border-radius:999px;background:rgba(255,255,255,.1);overflow:hidden}
+.meter i{display:block;height:100%;width:var(--w);border-radius:999px;background:linear-gradient(90deg,#ff8a00,#ffd45a);transition:width 1.2s cubic-bezier(.2,.8,.2,1) .3s}
+.pre.bar,.meter i.pre{width:0!important}
+/* Zahlenstrahl der Schätzfrage */
+.nl{position:relative;height:clamp(200px,34vh,340px);margin:0 clamp(40px,6vw,90px)}
+.nl .axis{position:absolute;left:-30px;right:-30px;top:50%;height:6px;border-radius:3px;background:linear-gradient(90deg,rgba(255,255,255,.2),rgba(255,255,255,.6),rgba(255,255,255,.2))}
+.pin{position:absolute;top:50%;width:0;transition:left 1s cubic-bezier(.2,.8,.2,1),opacity .5s,transform .6s cubic-bezier(.2,1.4,.4,1)}
+.pin::before{content:"";position:absolute;left:-10px;top:-10px;width:20px;height:20px;border-radius:50%;background:var(--blue);border:3px solid #fff;box-shadow:0 0 14px rgba(61,123,255,.8)}
+.pin span{position:absolute;left:0;transform:translateX(-50%);white-space:nowrap;text-align:center;font-weight:700;font-size:clamp(14px,1.5vw,22px)}
+.pin .pv{font-family:Bungee,sans-serif;font-weight:400;color:var(--gold)}
+.pin.upr .pn{bottom:44px}.pin.upr .pv{bottom:16px}
+.pin.dn .pn{top:44px}.pin.dn .pv{top:16px}
+.pin.best::before{background:var(--gold);box-shadow:0 0 24px rgba(255,194,58,.95);transform:scale(1.4)}
+.pin.best .pn{color:var(--gold)}
+.pin.pre{opacity:0;transform:translateY(-60px)}
+.truth{position:absolute;top:4%;bottom:4%;width:0;border-left:5px solid var(--ok);box-shadow:0 0 24px rgba(97,229,154,.9);transition:transform .8s cubic-bezier(.2,1.4,.4,1) .3s,opacity .4s .3s;transform-origin:center}
+.truth span{position:absolute;top:-1.4em;left:0;transform:translateX(-50%);white-space:nowrap;font:400 clamp(18px,2vw,32px)/1 Bungee,sans-serif;color:var(--ok)}
+.truth.pre{transform:scaleY(0);opacity:0}
+/* Rangliste: Pfeile, Joker, Trommelwirbel */
+.mv{display:inline-block;margin-left:14px;font:400 .62em/1 Bungee,sans-serif;padding:.25em .5em;border-radius:999px;vertical-align:middle;animation:pop .5s cubic-bezier(.2,1.4,.4,1) 2.4s both}
+.mv.up{background:rgba(97,229,154,.2);color:var(--ok)}
+.mv.down{background:rgba(255,79,79,.2);color:#ff8a7a}
+#s li.first .mv{background:rgba(43,19,0,.15);color:var(--goldink)}
+.jk{font-size:.7em;margin-left:10px;vertical-align:middle}
+#rk.anim li{position:relative;z-index:1}
+.drumov{position:absolute;inset:0;display:grid;place-content:center;justify-items:center;background:rgba(3,7,24,.78);z-index:20;text-align:center}
+.drumov div{font-size:clamp(90px,18vh,200px);animation:shake .12s linear infinite}
+.drumov p{font:400 clamp(34px,5vw,80px)/1.1 Bungee,sans-serif;color:var(--gold);text-shadow:0 0 30px rgba(255,170,40,.7);margin:10px 0 0}
+@keyframes shake{0%{transform:rotate(-6deg)}50%{transform:rotate(6deg) translateY(-6px)}100%{transform:rotate(-6deg)}}
+@media(max-width:800px){.lobby,.withpic{grid-template-columns:minmax(0,1fr)}.lobby .join{grid-template-columns:minmax(0,1fr)}.stage img,.withpic img{max-height:40vh}.q .op{grid-template-columns:minmax(0,1fr)}.corner{display:none}.q.hasimg{grid-template-columns:minmax(0,1fr)}}
 </style>
 </head>
 <body>
 <div id="s"><p>Wird geladen…</p></div>
 <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.js"></script>
-<script type="module" src="js/screen.js?v=20261127e"></script>
+<script type="module" src="js/screen.js?v=20261127f"></script>
 </body>
 </html>

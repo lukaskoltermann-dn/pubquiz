@@ -99,6 +99,28 @@ th{font-size:13px;color:var(--muted);font-weight:600}
 .welcome img{margin-bottom:-18px;width:100%}
 .bubble{background:#fff;color:#07102e;border-radius:16px;padding:10px 14px;font-weight:600;position:relative}
 .bubble::after{content:"";position:absolute;right:-10px;bottom:16px;border:8px solid transparent;border-left-color:#fff}
+/* Team-Emoji, Joker, Bilder, Auflösung */
+.emo{display:grid;grid-template-columns:repeat(auto-fill,minmax(46px,1fr));gap:6px}
+.emo button{font-size:24px;padding:0;min-height:46px;background:rgba(255,255,255,.05)}
+.emo button[aria-checked=true]{background:linear-gradient(180deg,#ffd45a,#ff9a10);border-color:#ffe08a;box-shadow:0 0 14px rgba(255,170,40,.5)}
+.joker{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:12px;align-items:center;padding:10px 14px;border-radius:16px;border:1px dashed rgba(255,194,58,.6);background:rgba(255,194,58,.07)}
+.joker .jk{font-size:30px;line-height:1}
+.joker.on{border-style:solid;background:linear-gradient(180deg,#ffd45a,#ff9a10);color:var(--goldink);box-shadow:0 0 24px rgba(255,170,40,.5);animation:pop .4s ease-out}
+.joker.on button{background:rgba(43,19,0,.12);color:var(--goldink);border-color:rgba(43,19,0,.4)}
+.qimg{display:block;width:100%;max-height:55vh;object-fit:contain;border-radius:12px;background:#000;margin:0 0 10px}
+.qimg.noimg{min-height:60px;background:rgba(255,255,255,.06);color:var(--muted);padding:10px}
+.sol{font-size:20px;margin:4px 0}
+.sol b{color:var(--ok)}
+.res{font:400 22px/1.2 Bungee,sans-serif;margin:6px 0 0}
+.res.ok{color:var(--ok)}
+.res.no{color:#ff8a7a}
+.up{color:var(--ok);font-weight:700}
+.down{color:#ff8a7a;font-weight:700}
+.board li.first .up,.board li.first .down{color:var(--goldink)}
+.drum{font:400 20px/1.3 Bungee,sans-serif;color:var(--gold);animation:pulse 1s ease-in-out infinite}
+.timer.hot{background:var(--red);color:#fff;border-color:#ff9a8e;animation:pulse .5s ease-in-out infinite alternate}
+@keyframes pulse{to{transform:scale(1.08)}}
+@keyframes pop{from{transform:scale(.6);opacity:0}}
 @media(max-width:860px){.grid2{grid-template-columns:minmax(0,1fr)}}
 @media(max-width:420px){.welcome{grid-template-columns:minmax(0,1fr) 110px}}
 @media(prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}

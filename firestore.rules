@@ -24,6 +24,12 @@ service cloud.firestore {
         allow read, write: if ownsGame(code);
       }
 
+      // Bilder zu Fragen: alle Mitspieler dürfen lesen, nur der Moderator schreiben
+      match /media/{imgId} {
+        allow read: if signedIn();
+        allow write: if ownsGame(code);
+      }
+
       // Teams melden sich selbst an
       match /teams/{teamId} {
         allow read: if signedIn() && (request.auth.uid == teamId || ownsGame(code));

@@ -36,7 +36,7 @@ export function parseNumber(s) {
 
 export function linesToQuiz(lines, title = "Neues Quiz") {
   const quiz = { title, rounds: [] };
-  let round = null, q = null, estimateNext = false;
+  let round = null, q = null, estimateNext = false, imgNext = "";
   const newRound = (name, music) => { round = { id: uid(), name: name || `Runde ${quiz.rounds.length + 1}`, music, items: [] }; quiz.rounds.push(round); q = null; };
   const finish = () => {
     if (!q) return;
@@ -54,10 +54,14 @@ export function linesToQuiz(lines, title = "Neues Quiz") {
     finish();
     if (!round) newRound("", false);
     q = { id: uid(), type: "mc", text, options: [], _bold: [], correct: -1, answer: "", note: "", estimate: estimateNext };
+    if (imgNext) { q.img = imgNext; imgNext = ""; }
     round.items.push(q); estimateNext = false;
   };
 
   for (const { t, b } of lines) {
+    // Bild aus dem Word-Dokument: gehört zur aktuellen Frage, sonst zur nächsten
+    const im = t.match(/^\u0000IMG:(\d+)$/);
+    if (im) { if (round?.music) continue; if (q && !q.img && q.options.length === 0) q.img = "docx:" + im[1]; else imgNext = "docx:" + im[1]; continue; }
     const h = t.match(HEAD);
     if (h && !OPT.test(t)) {
       finish();
@@ -93,8 +97,20 @@ export async function docxToQuiz(buf, title) {
   const xml = await zip.file("word/document.xml").async("string");
   const d = new DOMParser().parseFromString(xml, "application/xml");
   const W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
-  const paras = [];
+  const paras = [], imgs = {};
+  // Bilder: Verweise auf word/media/... über die Beziehungen auflösen
+  const relXml = await zip.file("word/_rels/document.xml.rels")?.async("string");
+  const rels = {};
+  if (relXml) for (const r of new DOMParser().parseFromString(relXml, "application/xml").getElementsByTagName("Relationship")) rels[r.getAttribute("Id")] = r.getAttribute("Target");
+  const RNS = "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
+  let nImg = 0;
   for (const p of d.getElementsByTagNameNS(W, "p")) {
+    const pics = [];
+    for (const bl of p.getElementsByTagNameNS("http://schemas.openxmlformats.org/drawingml/2006/main", "blip")) {
+      const t = rels[bl.getAttributeNS(RNS, "embed") || bl.getAttribute("r:embed")];
+      const f = t && zip.file("word/" + t.replace(/^\/?(word\/)?/, ""));
+      if (f) { const n = nImg++; imgs[n] = await f.async("blob"); pics.push(n); }
+    }
     const segs = [];
     for (const r of p.getElementsByTagNameNS(W, "r")) {
       const bEl = [...r.childNodes].find(n => n.localName === "rPr");
@@ -107,6 +123,9 @@ export async function docxToQuiz(buf, title) {
       }
     }
     paras.push(segs);
+    for (const n of pics) paras.push([["\u0000IMG:" + n, false]]);
   }
-  return linesToQuiz(paragraphsToLines(paras), title);
+  const quiz = linesToQuiz(paragraphsToLines(paras), title);
+  quiz._imgs = imgs;
+  return quiz;
 }

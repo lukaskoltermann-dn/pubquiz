@@ -1,13 +1,15 @@
-import { ready, auth, db, signInWithEmailAndPassword, signOut, onAuthStateChanged, doc, getDoc, setDoc, updateDoc, deleteDoc, onSnapshot, collection, getDocs, $, esc, keepEmu, until } from "./fb.js?v=20261127e";
-import { docxToQuiz, uid } from "./importer.js?v=20261127e";
-import { slots, counts, suggest, answerText, rightText, roundPoints, total, ranking } from "./scoring.js?v=20261127e";
+import { ready, auth, db, signInWithEmailAndPassword, signOut, onAuthStateChanged, doc, getDoc, setDoc, updateDoc, deleteDoc, onSnapshot, collection, getDocs, $, esc, keepEmu, until, hydrate } from "./fb.js?v=20261127f";
+import * as fx from "./fx.js?v=20261127f";
+import { docxToQuiz, uid } from "./importer.js?v=20261127f";
+import { slots, counts, suggest, answerText, rightText, roundPoints, total, ranking } from "./scoring.js?v=20261127f";
 
 const app = $("app");
 const toast = m => { const t = $("toast"); t.textContent = m; t.style.display = "block"; clearTimeout(toast.t); toast.t = setTimeout(() => t.style.display = "none", 3500); };
 const LSG = "pq-host-game";
 let user = null, quizzes = [], editing = null, editT = null;
 // Live-Spiel
-let code = null, game = null, hs = null, teams = [], allTeams = [], raw = {}, subs = [], hsT = null, tick = null, view = "round";
+let code = null, game = null, hs = null, teams = [], allTeams = [], raw = {}, subs = [], hsT = null, tick = null, view = "round", lastSec = null, gonged = 0;
+document.addEventListener("pointerdown", () => fx.unlock(), true);
 
 // ---------- Anmeldung ----------
 function login(msg = "") {
@@ -48,6 +50,10 @@ async function home() {
     try {
       const q = await docxToQuiz(await f.arrayBuffer(), f.name.replace(/\.docx$/i, "").replace(/_?\[\d+\]$/, "").replace(/_/g, " "));
       if (!q.rounds.length) return toast("In der Datei habe ich keine Runden gefunden.");
+      const imgs = q._imgs || {}; delete q._imgs;
+      const withImg = q.rounds.flatMap(r => r.items).filter(it => String(it.img || "").startsWith("docx:"));
+      if (withImg.length) toast(`${withImg.length} Bilder werden hochgeladen…`);
+      for (const it of withImg) { try { it.img = await storeImg(imgs[it.img.slice(5)]); } catch (err) { console.error(err); delete it.img; } }
       await saveQuiz({ ...q, id: uid() }); edit(quizzes.find(x => x.id === editing?.id) || editing);
       toast(`${q.rounds.length} Runden importiert. Bitte einmal drüberschauen.`);
     } catch (err) { console.error(err); toast("Die Datei konnte ich nicht lesen."); }
@@ -77,6 +83,9 @@ function itemEditor(it, ri, ii) {
     if (it.type === "mc") body += `<div class="row2"><label style="flex:3 1 260px">Antworten (eine pro Zeile)<textarea data-f="options" data-k="${k}">${esc((it.options || []).join("\n"))}</textarea></label>
       <label style="flex:1 1 120px">Richtig<select data-f="correct" data-k="${k}"><option value="-1">–</option>${(it.options || []).map((o, i) => `<option value="${i}" ${it.correct === i ? "selected" : ""}>${"abcdefgh"[i]}) ${esc(o.slice(0, 30))}</option>`).join("")}</select></label></div>`;
     else body += `<label>Richtige Antwort${it.type === "estimate" ? " (Zahl)" : ""}<input data-f="answer" data-k="${k}" value="${esc(it.answer ?? "")}"></label>`;
+    const own = String(it.img || "").startsWith("media:");
+    body += `<div class="row2"><label style="flex:3 1 260px">Bild (optional): Link einfügen oder hochladen<input data-f="img" data-k="${k}" value="${esc(own ? "" : it.img || "")}" placeholder="${own ? "Hochgeladenes Bild" : "https://…/bild.jpg"}"></label>
+      <label class="filebtn" style="align-self:end">Bild hochladen<input type="file" accept="image/*" data-upload="${k}"></label>${it.img ? `<button data-noimg="${k}" style="align-self:end">Bild entfernen</button>` : ""}</div>${it.img ? `<img class="thumb" data-img="${esc(it.img)}" alt="Bild zu Frage ${ii + 1}">` : ""}`;
   }
   return `<div class="card item"><div class="row2" style="justify-content:space-between"><b>${it.type === "music" ? "Lied" : "Frage"} ${ii + 1}</b><div class="row2"><button data-up="${k}" aria-label="Nach oben">↑</button><button data-delitem="${k}" aria-label="Löschen">✕</button></div></div>
     <div class="row2">${type}</div>${body}<label>Notiz für dich (sehen die Teams nicht)<input data-f="note" data-k="${k}" value="${esc(it.note || "")}"></label></div>`;
@@ -99,6 +108,19 @@ function renderEditor() {
       ${r.items.map((it, ii) => itemEditor(it, ri, ii)).join("")}
       <div class="row2"><button data-additem="${ri}">${r.music ? "Lied" : "Frage"} hinzufügen</button></div></section>`).join("")}
     <button id="addround">Runde hinzufügen</button></div>`;
+  hydrate(app, null, user.uid);
+}
+// Bilder verkleinern und in Firestore ablegen (ohne extra Speicher-Dienst)
+async function shrink(blob) {
+  const bm = await createImageBitmap(blob), sc = Math.min(1, 1280 / Math.max(bm.width, bm.height));
+  const c = document.createElement("canvas"); c.width = Math.round(bm.width * sc); c.height = Math.round(bm.height * sc);
+  const x = c.getContext("2d"); x.fillStyle = "#fff"; x.fillRect(0, 0, c.width, c.height); x.drawImage(bm, 0, 0, c.width, c.height);
+  for (const q of [.82, .7, .55, .4, .3]) { const d = c.toDataURL("image/jpeg", q); if (d.length < 850000) return d; }
+  throw new Error("Bild zu groß");
+}
+async function storeImg(blob) {
+  const id = uid(); await setDoc(doc(db, "users", user.uid, "media", id), { data: await shrink(blob), at: Date.now() });
+  return "media:" + id;
 }
 function autosave() { clearTimeout(editT); editT = setTimeout(() => saveQuiz(editing).catch(() => toast("Speichern fehlgeschlagen")), 800); }
 app.addEventListener("input", e => {
@@ -110,15 +132,22 @@ app.addEventListener("input", e => {
     const [ri, ii] = el.dataset.k.split("-").map(Number), it = editing.rounds[ri].items[ii];
     if (el.dataset.f === "options") it.options = el.value.split("\n").map(s => s.trim()).filter(Boolean);
     else if (el.dataset.f === "start") it.start = Math.max(0, parseInt(el.value) || 0);
+    else if (el.dataset.f === "img") { it.img = el.value.trim(); clearTimeout(el.t); el.t = setTimeout(renderEditor, 1200); }
     else if (el.dataset.f === "answer" && it.type === "estimate") it.answer = el.value.trim() === "" ? null : parseFloat(el.value.replace(",", "."));
     else it[el.dataset.f] = el.value;
     autosave();
   }
 });
-app.addEventListener("change", e => {
+app.addEventListener("change", async e => {
   if (!editing || code) return;
   const el = e.target;
   if (el.dataset.rf === "music") { editing.rounds[+el.dataset.r].music = el.checked; autosave(); return renderEditor(); }
+  if (el.dataset.upload && el.files[0]) {
+    const [ri, ii] = el.dataset.upload.split("-").map(Number), it = editing.rounds[ri].items[ii];
+    toast("Bild wird hochgeladen…");
+    try { it.img = await storeImg(el.files[0]); autosave(); renderEditor(); toast("Bild gespeichert."); } catch (err) { console.error(err); toast("Das Bild konnte ich nicht speichern."); }
+    return;
+  }
   if (el.dataset.f === "type" || el.dataset.f === "correct" || el.dataset.f === "options") {
     const [ri, ii] = el.dataset.k.split("-").map(Number), it = editing.rounds[ri].items[ii];
     if (el.dataset.f === "type") { it.type = el.value; it.options ||= []; it.correct ??= -1; it.a ||= ""; it.b ||= ""; it.text ||= ""; }
@@ -133,6 +162,7 @@ app.addEventListener("click", async e => {
   if (b.dataset.additem) { const r = R[+b.dataset.additem]; r.items.push(r.music ? { id: uid(), type: "music", a: "", b: "", note: "" } : { id: uid(), type: "mc", text: "", options: [], correct: -1, answer: "", note: "" }); }
   else if (b.dataset.delitem) { const [ri, ii] = b.dataset.delitem.split("-").map(Number); R[ri].items.splice(ii, 1); }
   else if (b.dataset.up) { const [ri, ii] = b.dataset.up.split("-").map(Number); if (ii > 0) [R[ri].items[ii - 1], R[ri].items[ii]] = [R[ri].items[ii], R[ri].items[ii - 1]]; }
+  else if (b.dataset.noimg) { const [ri, ii] = b.dataset.noimg.split("-").map(Number); delete R[ri].items[ii].img; }
   else if (b.dataset.delround) { if (R[+b.dataset.delround].items.length && b.textContent !== "Wirklich löschen?") { b.textContent = "Wirklich löschen?"; return; } R.splice(+b.dataset.delround, 1); }
   else if (b.id === "addround") R.push({ id: uid(), name: `Runde ${R.length + 1}`, music: false, items: [] });
   else if (b.id === "delq") { if (b.textContent !== "Wirklich löschen?") { b.textContent = "Wirklich löschen?"; return; } await deleteDoc(doc(db, "users", user.uid, "quizzes", editing.id)); editing = null; return home(); }
@@ -146,8 +176,12 @@ async function startGame(q) {
   let c = "";
   for (let i = 0; i < 10; i++) { c = Array.from({ length: 5 }, () => A[Math.floor(Math.random() * A.length)]).join(""); if (!(await getDoc(doc(db, "games", c))).exists()) break; }
   const quiz = JSON.parse(JSON.stringify(q));
-  await setDoc(doc(db, "games", c), { ownerUid: user.uid, title: quiz.title, phase: "lobby", roundIdx: -1, roundId: "", roundName: "", questions: [], deadline: 0, board: [], boardRound: -1, reveal: 0, teamNames: [], roundCount: quiz.rounds.length, createdAt: Date.now() });
-  await setDoc(doc(db, "games", c, "host", "state"), { quiz, marks: {}, bonus: {}, relIds: [] });
+  await setDoc(doc(db, "games", c), { ownerUid: user.uid, title: quiz.title, phase: "lobby", roundIdx: -1, roundId: "", roundName: "", questions: [], deadline: 0, board: [], boardRound: -1, reveal: 0, teamNames: [], roundCount: quiz.rounds.length, answered: 0, jokers: {}, createdAt: Date.now() });
+  await setDoc(doc(db, "games", c, "host", "state"), { quiz, marks: {}, bonus: {}, relIds: [], jokers: {} });
+  const refs = [...new Set(quiz.rounds.flatMap(r => r.items).map(it => String(it.img || "")).filter(x => x.startsWith("media:")))];
+  let fail = 0;
+  await Promise.all(refs.map(async ref => { try { const m = await getDoc(doc(db, "users", user.uid, "media", ref.slice(6))); if (m.exists()) await setDoc(doc(db, "games", c, "media", ref.slice(6)), m.data()); } catch (e) { console.error(e); fail++; } }));
+  if (fail) setTimeout(() => toast("Die Bilder konnten nicht für die Teams freigegeben werden. Bitte die neuen Firestore-Regeln einfügen."), 1500);
   localStorage.setItem(LSG, c);
   editing = null; openLive(c);
 }
@@ -169,9 +203,16 @@ async function openLive(c) {
   }));
   subs.push(onSnapshot(collection(db, "games", c, "answers"), s => {
     s.docChanges().forEach(ch => { const d = ch.doc.data(); raw[d.round] ||= {}; if (ch.type === "removed") delete raw[d.round][d.uid]; else raw[d.round][d.uid] = { a: d.a || {}, at: d.at || 0 }; });
-    renderLive();
+    syncLive(); renderLive();
   }));
-  tick = setInterval(() => { const t = $("htimer"); if (t && game?.deadline) { const l = game.deadline - Date.now(); t.textContent = l > 0 ? until(l) : "Zeit um"; } }, 500);
+  tick = setInterval(() => {
+    const t = $("htimer"); if (!game?.deadline || game.phase !== "answering") return;
+    const l = game.deadline - Date.now(); if (t) t.textContent = l > 0 ? until(l) : "Zeit um";
+    // letzte 10 Sekunden ticken, dann Gong
+    const sec = Math.ceil(l / 1000);
+    if (l > 0 && sec <= 10 && sec !== lastSec) { lastSec = sec; fx.tick(sec <= 3); }
+    if (l <= 0 && l > -3000 && gonged !== game.deadline) { gonged = game.deadline; fx.gong(); }
+  }, 100);
 }
 
 // Handywechsel: neue Handy-IDs zeigen auf das ursprüngliche Team
@@ -183,7 +224,20 @@ function roundAnswers(rid) {
   Object.entries(raw[rid] || {}).sort((a, b) => a[1].at - b[1].at).forEach(([uid, v]) => { const t = eff(uid); out[t] = { ...(out[t] || {}), ...v.a }; });
   return out;
 }
-const norm = s => String(s || "").toLowerCase().replace(/\s+/g, " ").trim();
+const norm = s => String(s || "").toLowerCase().replace(/[^\p{L}\p{N}]+/gu, " ").trim();
+// Joker (einmal pro Abend: die erste Runde, in der ein Team ihn setzt) und "X von Y haben geantwortet"
+const hasAns = a => Object.keys(a || {}).some(k => k !== "_joker");
+function syncLive() {
+  if (!game || !hs) return;
+  const j = {};
+  for (const r of quiz().rounds) { const A = roundAnswers(r.id); for (const t of teams) if (!j[t.id] && A[t.id]?._joker) j[t.id] = r.id; }
+  const upd = {};
+  if (JSON.stringify(j) !== JSON.stringify(hs.jokers || {})) { hs.jokers = j; saveHs(); }
+  if (JSON.stringify(j) !== JSON.stringify(game.jokers || {})) upd.jokers = j;
+  const r = curRound(), n = r ? Object.values(roundAnswers(r.id)).filter(hasAns).length : 0;
+  if ((game.phase === "question" || game.phase === "answering") && n !== (game.answered || 0)) upd.answered = n;
+  if (Object.keys(upd).length) pub(upd);
+}
 function dupeOf(t) { return teams.find(o => o.id !== t.id && o.at < t.at && norm(o.name) === norm(t.name)); }
 async function mergeTeam(newId, oldId) {
   hs.alias ||= {}; hs.alias[newId] = oldId;
@@ -205,8 +259,32 @@ function estimateInfo() {
   }
   return null;
 }
-const board = () => ranking(quiz(), hs, teams, estimateInfo()).map(r => ({ id: r.id, name: r.name, total: r.total, place: r.place }));
-const publicItem = (it, n) => it.type === "music" ? { id: it.id, type: "music", n, text: "" } : it.type === "mc" ? { id: it.id, type: "mc", n, text: it.text, options: it.options } : { id: it.id, type: it.type, n, text: it.text };
+function board() {
+  const before = game.roundIdx > 0 ? ranking({ ...quiz(), rounds: quiz().rounds.slice(0, game.roundIdx) }, hs, teams, null) : null;
+  const rid = curRound()?.id;
+  return ranking(quiz(), hs, teams, estimateInfo()).map(r => {
+    const b = before?.find(x => x.id === r.id), o = { id: r.id, name: r.name, total: r.total, place: r.place };
+    if (b) { o.prev = b.place; o.prevTotal = b.total; o.pi = before.indexOf(b); }
+    if (hs.jokers?.[r.id] && hs.jokers[r.id] === rid) o.joker = true;
+    return o;
+  });
+}
+const publicItem = (it, n) => { const o = it.type === "music" ? { id: it.id, type: "music", n, text: "" } : it.type === "mc" ? { id: it.id, type: "mc", n, text: it.text, options: it.options } : { id: it.id, type: it.type, n, text: it.text }; if (it.img && it.type !== "music") o.img = it.img; return o; };
+
+// ---------- Auflösung auf dem Beamer ----------
+const num = v => { const g = parseFloat(String(v ?? "").replace(",", ".")); return Number.isFinite(g) ? g : null; };
+function solData(idx, shown) {
+  const r = curRound(), it = r.items[idx], A = roundAnswers(r.id);
+  const o = { id: it.id, idx, count: r.items.length, label: itemLabel(r, idx), type: it.type, text: it.type === "music" ? "" : it.text || "", img: it.type !== "music" && it.img || "", shown, of: teams.length, pts: {} };
+  const m = t => hs.marks[t.id]?.[r.id]?.[it.id] || [];
+  for (const t of teams) o.pts[t.id] = m(t).reduce((a, v) => a + Math.min(2, +v || 0), 0);
+  o.ok = teams.filter(t => o.pts[t.id] > 0).length;
+  if (it.type === "mc") { o.options = it.options; o.correct = it.correct; o.picks = it.options.map((_, k) => teams.filter(t => A[t.id]?.[it.id] !== undefined && A[t.id][it.id] !== "" && +A[t.id][it.id] === k).length); }
+  else if (it.type === "music") { o.a = it.a; o.b = it.b; o.parts = [0, 1].map(s => teams.filter(t => (m(t)[s] || 0) > 0).length); }
+  else if (it.type === "estimate") { o.answer = num(it.answer); o.guesses = teams.map(t => ({ id: t.id, name: t.name, v: num(A[t.id]?.[it.id]) })).filter(g => g.v !== null); }
+  else o.answer = String(it.answer ?? "");
+  return o;
+}
 
 const relIds = r => hs.relIds || r.items.slice(0, hs.released || 0).map(it => it.id);
 const publicList = r => r.items.map((it, i) => [it, i]).filter(([it]) => relIds(r).includes(it.id)).map(([it, i]) => publicItem(it, r.items.slice(0, i + 1).filter(x => x.type !== "estimate").length));
@@ -259,7 +337,7 @@ async function act(a) {
   if (a === "startRound" || a === "nextRound") {
     const i = a === "startRound" ? 0 : game.roundIdx + 1, nr = quiz().rounds[i];
     hs.relIds = []; saveHs();
-    await pub({ phase: "question", roundIdx: i, roundId: nr.id, roundName: nr.name, questions: [], currentId: "", deadline: 0, playing: null });
+    await pub({ phase: "question", roundIdx: i, roundId: nr.id, roundName: nr.name, questions: [], currentId: "", deadline: 0, playing: null, answered: 0, sol: null });
   }
   if (a === "release") { const next = r.items.find(it => !relIds(r).includes(it.id)); if (next) await releaseItem(next.id); }
   if (a === "releaseAll") await releaseItem(null, true);
@@ -274,9 +352,18 @@ async function act(a) {
     applySuggestions(false); view = "grade";
   }
   if (a === "reopen") await pub({ phase: "answering", deadline: 0 });
-  if (a === "results") await pub({ phase: "results", board: board(), boardRound: game.roundIdx });
+  if (a === "solve") { view = "round"; await pub({ phase: "solve", sol: solData(0, false) }); }
+  if (a === "solShow") { await pub({ sol: solData(game.sol?.idx || 0, true) }); fx.ding(); }
+  if (a === "solNext" || a === "solPrev") { const i = Math.max(0, Math.min(r.items.length - 1, (game.sol?.idx || 0) + (a === "solNext" ? 1 : -1))); await pub({ sol: solData(i, false) }); }
+  if (a === "results") { await pub({ phase: "results", board: board(), boardRound: game.roundIdx }); fx.tada(); }
   if (a === "final") await pub({ phase: "final", board: board(), boardRound: game.roundIdx, reveal: 0 });
-  if (a === "reveal") await pub({ reveal: Math.min((game.reveal || 0) + 1, teams.length) });
+  if (a === "reveal") {
+    const n = Math.min((game.reveal || 0) + 1, teams.length);
+    if (n === teams.length) { // der Sieger: erst Trommelwirbel, dann Fanfare
+      await pub({ drum: true }); fx.drumroll(2.6); await new Promise(res => setTimeout(res, 2700));
+      await pub({ reveal: n, drum: false }); fx.fanfare();
+    } else { await pub({ reveal: n }); fx.ding(); }
+  }
   if (a === "end") { localStorage.removeItem(LSG); stopLive(); home(); }
   renderLive();
 }
@@ -297,7 +384,8 @@ function renderLive() {
   const focus = document.activeElement?.id;
   const r = curRound(), ph = game.phase, last = game.roundIdx >= quiz().rounds.length - 1;
   const join = location.origin + location.pathname.replace(/host\.html$/, "") + `?g=${code}`;
-  $("topacts").innerHTML = `<a href="${esc(keepEmu(`screen.html?g=${code}`))}" target="_blank"><button class="main">Beamer öffnen</button></a><button id="endb">Abend beenden</button>`;
+  $("topacts").innerHTML = `<button id="fxb" aria-pressed="${fx.fxOn()}" title="Gong, Ticken, Trommelwirbel und Fanfare">${fx.fxOn() ? "🔊 Show-Sounds an" : "🔇 Show-Sounds aus"}</button><a href="${esc(keepEmu(`screen.html?g=${code}`))}" target="_blank"><button class="main">Beamer öffnen</button></a><button id="endb">Abend beenden</button>`;
+  $("fxb").onclick = () => { fx.setFx(!fx.fxOn()); fx.unlock(); renderLive(); };
   $("endb").onclick = () => { if ($("endb").textContent === "Wirklich beenden?") act("end"); else $("endb").textContent = "Wirklich beenden?"; };
 
   let ctrl = "";
@@ -308,16 +396,24 @@ function renderLive() {
       ${ph === "question" ? `<p class="hint">Die Teams sehen die Fragen zum Mitlesen, antworten können sie erst, wenn die Antwortzeit läuft.</p>` : ""}
       <div class="row2">${ph === "answering" ? `<span class="pill timer big" id="htimer">${until(game.deadline - Date.now())}</span><button data-a="plus1">+1 Minute</button>` : `<label style="width:110px">Minuten<input id="mins" type="number" min="1" value="10"></label><button class="main" data-a="timer" style="align-self:end">Antwortzeit starten</button>`}
       <button class="red" data-a="lock" style="align-self:end">Runde schließen</button></div>`;
-  } else if (ph === "locked") ctrl = `<p>Runde geschlossen. Prüfe unten die Antworten, dann:</p><div class="row2"><button class="main" data-a="${last ? "final" : "results"}">${last ? "Siegerehrung starten" : "Stand auf Beamer zeigen"}</button><button data-a="reopen">Runde wieder öffnen</button></div>`;
+  } else if (ph === "locked") ctrl = `<p>Runde geschlossen. Prüfe unten die Antworten, dann:</p><div class="row2"><button class="main" data-a="solve">Auflösung auf dem Beamer</button><button data-a="${last ? "final" : "results"}">${last ? "Direkt zur Siegerehrung" : "Direkt zum Stand"}</button><button data-a="reopen">Runde wieder öffnen</button></div>`;
+  else if (ph === "solve") {
+    const so = game.sol || { idx: 0, count: r.items.length }, it = r.items[so.idx], end = so.idx >= r.items.length - 1;
+    ctrl = `<p>Auflösung: <b>${esc(itemLabel(r, so.idx))}</b> (${so.idx + 1} von ${r.items.length}). ${so.shown ? `<span class="okc">Lösung ist aufgedeckt: ${esc(rightText(it))}</span>` : "Die Teams sehen die Frage, die Lösung noch nicht."}</p>
+      <div class="row2">${so.shown ? (end ? `<button class="main" data-a="${last ? "final" : "results"}">${last ? "Siegerehrung starten" : "Stand auf Beamer zeigen"}</button>` : `<button class="main" data-a="solNext">Nächste Frage</button>`) : `<button class="main" data-a="solShow">Lösung aufdecken</button>${end ? "" : `<button data-a="solNext">Überspringen</button>`}`}
+      <button data-a="solPrev" ${so.idx ? "" : "disabled"}>Zurück</button>${so.shown && !end ? `<button data-a="${last ? "final" : "results"}">${last ? "Zur Siegerehrung" : "Zum Stand"}</button>` : ""}</div>
+      <p class="hint">Die Statistik kommt aus deinen Haken unter „Antworten prüfen“. Korrigierst du dort etwas, drück einfach noch mal „Lösung aufdecken“.</p>`;
+  }
   else if (ph === "results") ctrl = `<p>Der Stand nach Runde ${game.roundIdx + 1} ist auf dem Beamer und den Handys.</p><div class="row2">${last ? `<button class="main" data-a="final">Siegerehrung starten</button>` : `<button class="main" data-a="nextRound">Runde ${game.roundIdx + 2} starten</button>`}<button data-a="results">Stand aktualisieren</button></div>`;
-  else if (ph === "final") ctrl = `<p>${(game.reveal || 0) < teams.length ? `${game.reveal || 0} von ${teams.length} Plätzen aufgedeckt.` : "Alle Plätze aufgedeckt. Glückwunsch!"}</p><div class="row2"><button class="main" data-a="reveal" ${(game.reveal || 0) >= teams.length ? "disabled" : ""}>Nächsten Platz aufdecken</button><button data-a="final">Neu berechnen</button></div>`;
+  if (ph === "solve" && game.sol?.shown) ctrl = ctrl.replace(`<button data-a="solPrev"`, `<button data-a="solShow">Neu laden</button><button data-a="solPrev"`);
+  if (ph === "final") ctrl = `<p>${(game.reveal || 0) < teams.length ? `${game.reveal || 0} von ${teams.length} Plätzen aufgedeckt.` : "Alle Plätze aufgedeckt. Glückwunsch!"}</p><div class="row2"><button class="main" data-a="reveal" ${(game.reveal || 0) >= teams.length ? "disabled" : ""}>Nächsten Platz aufdecken</button><button data-a="final">Neu berechnen</button></div>`;
 
   const rids = r ? relIds(r) : [], nextId = r?.items.find(it => !rids.includes(it.id))?.id;
   const script = r ? r.items.map((it, i) => { const done = rids.includes(it.id), canRel = ph === "question" && !done;
-    return `<div class="script${done ? " done" : ""}"><div class="row2" style="justify-content:space-between;align-items:flex-start;flex-wrap:nowrap"><span class="qnum">${esc(itemLabel(r, i))}${done ? " · freigegeben ✓" : ""}</span>${canRel ? `<button class="${it.id === nextId ? "main" : ""}" data-rel="${esc(it.id)}" style="flex:none">Freigeben</button>` : ""}</div>${it.type === "music" ? `<b>${esc(it.a)} – ${esc(it.b)}</b>${trackId(it.spotify) ? `<div class="row2" style="margin:6px 0"><button class="main" data-play="${esc(it.id)}">▶ ${CLIP} Sek. abspielen</button><button data-stop="1">■ Stopp</button>${it.start ? `<span class="hint">ab Sekunde ${it.start}</span>` : ""}</div>` : `<br><span class="hint">Kein Spotify-Link hinterlegt</span>`}` : esc(it.text)}${it.type === "mc" ? `<br><span class="hint">${it.options.map((o, k) => `${"abcdefgh"[k]}) ${esc(o)}`).join(" · ")}</span>` : ""}<br><span class="right">${esc(rightText(it))}</span>${it.note ? `<br><span class="hint">${esc(it.note)}</span>` : ""}</div>`; }).join("")
+    return `<div class="script${done ? " done" : ""}"><div class="row2" style="justify-content:space-between;align-items:flex-start;flex-wrap:nowrap"><span class="qnum">${esc(itemLabel(r, i))}${done ? " · freigegeben ✓" : ""}</span>${canRel ? `<button class="${it.id === nextId ? "main" : ""}" data-rel="${esc(it.id)}" style="flex:none">Freigeben</button>` : ""}</div>${it.type === "music" ? `<b>${esc(it.a)} – ${esc(it.b)}</b>${trackId(it.spotify) ? `<div class="row2" style="margin:6px 0"><button class="main" data-play="${esc(it.id)}">▶ ${CLIP} Sek. abspielen</button><button data-stop="1">■ Stopp</button>${it.start ? `<span class="hint">ab Sekunde ${it.start}</span>` : ""}</div>` : `<br><span class="hint">Kein Spotify-Link hinterlegt</span>`}` : esc(it.text)}${it.type === "mc" ? `<br><span class="hint">${it.options.map((o, k) => `${"abcdefgh"[k]}) ${esc(o)}`).join(" · ")}</span>` : ""}${it.img && it.type !== "music" ? `<img class="thumb" data-img="${esc(it.img)}" alt="Bild">` : ""}<br><span class="right">${esc(rightText(it))}</span>${it.note ? `<br><span class="hint">${esc(it.note)}</span>` : ""}</div>`; }).join("")
     + (ph === "question" ? `<div class="row2"><button class="main" data-a="timer">Antwortzeit starten</button><span class="hint">Dauer wie oben eingestellt</span></div>` : "") : "";
 
-  const answered = r ? Object.keys(roundAnswers(r.id)).length : 0;
+  const answered = r ? Object.values(roundAnswers(r.id)).filter(hasAns).length : 0;
   const rows = ranking(quiz(), hs, teams, estimateInfo());
   const est = estimateInfo();
   app.innerHTML = `<div class="grid2">
@@ -327,11 +423,12 @@ function renderLive() {
       ${r ? `<div class="panel stack"><div class="tabs" role="tablist"><button data-v="round" aria-selected="${view === "round"}">Skript</button><button data-v="grade" aria-selected="${view === "grade"}">Antworten prüfen</button></div>${view === "round" ? script : gradeHtml(r)}</div>` : ""}
     </section>
     <section class="stack">
-      <div class="panel stack"><h2 class="slab">Rangliste</h2><ol class="board">${rows.map(x => `<li class="${x.place === 1 && x.total > 0 ? "first" : ""}"><span class="pl slab">${x.place}.</span><span><b>${esc(x.name)}</b>${x.diff !== undefined ? `<br><span class="hint">Schätzung ${x.diff === Infinity ? "fehlt" : `${+x.diff.toFixed(2)} daneben`}</span>` : ""}</span><span class="pts slab">${x.total}</span></li>`).join("") || `<p class="hint">Noch keine Teams</p>`}</ol>
+      <div class="panel stack"><h2 class="slab">Rangliste</h2><ol class="board">${rows.map(x => `<li class="${x.place === 1 && x.total > 0 ? "first" : ""}"><span class="pl slab">${x.place}.</span><span><b>${esc(x.name)}</b>${hs.jokers?.[x.id] ? ` <span class="pill" title="Joker in ${esc(quiz().rounds.find(q => q.id === hs.jokers[x.id])?.name || "")}">🃏 R${quiz().rounds.findIndex(q => q.id === hs.jokers[x.id]) + 1}</span>` : ""}${x.diff !== undefined ? `<br><span class="hint">Schätzung ${x.diff === Infinity ? "fehlt" : `${+x.diff.toFixed(2)} daneben`}</span>` : ""}</span><span class="pts slab">${x.total}</span></li>`).join("") || `<p class="hint">Noch keine Teams</p>`}</ol>
       ${rows.tiebreak === undefined && rows.filter(x => x.place === 1).length > 1 && rows[0].total > 0 ? `<p class="hint">Gleichstand auf Platz 1. ${est ? (est.answer === null || est.answer === undefined || est.answer === "" ? "Trag im Quiz die Lösung der Schätzfrage ein." : "Die Schätzfrage wurde noch nicht beantwortet.") : "Im Quiz gibt es keine Schätzfrage."}</p>` : ""}</div>
       <div class="panel stack"><h2 class="slab">Teams (${teams.length})</h2>${teams.map(t => { const d = dupeOf(t); return `<div class="row2" style="justify-content:space-between"><span>${esc(t.name)}${d ? `<br><span class="err">Handy gewechselt? Den Namen gibt es schon.</span>` : ""}</span><span class="row2">${d ? `<button class="main" data-merge="${esc(t.id)}|${esc(d.id)}">Zusammenführen</button>` : ""}<button data-kick="${esc(t.id)}" aria-label="${esc(t.name)} entfernen">✕</button></span></div>`; }).join("") || `<p class="hint">Noch niemand angemeldet.</p>`}</div>
     </section></div>`;
   try { const qr = qrcode(0, "M"); qr.addData(join); qr.make(); $("qr").innerHTML = qr.createSvgTag({ cellSize: 4, margin: 0 }); } catch {}
+  hydrate(app, null, user.uid);
   if (focus && $(focus)) $(focus).focus();
 }
 
@@ -347,7 +444,7 @@ function gradeHtml(r) {
         return `<div class="grow"><span>${esc(t.name)}</span><span class="ans${txt ? " has" : ""}">${esc(txt || "keine Antwort")}</span><span class="chips">${chips}</span></div>`;
       }).join("")}</div>`;
   }).join("");
-  const sums = teams.map(t => `<div class="grow"><span>${esc(t.name)}</span><label style="max-width:150px">Rundenbonus<input id="bon-${esc(t.id)}" data-bonus="${esc(t.id)}" inputmode="numeric" value="${esc(hs.bonus[t.id]?.[r.id] || "")}" placeholder="0"></label><span class="slab big">${roundPoints(quiz(), hs, t.id, r)}</span></div>`).join("");
+  const sums = teams.map(t => `<div class="grow"><span>${esc(t.name)}${hs.jokers?.[t.id] === r.id ? `<br><span class="pill">🃏 Joker: Fragenpunkte ×2</span>` : ""}</span><label style="max-width:150px">Rundenbonus<input id="bon-${esc(t.id)}" data-bonus="${esc(t.id)}" inputmode="numeric" value="${esc(hs.bonus[t.id]?.[r.id] || "")}" placeholder="0"></label><span class="slab big">${roundPoints(quiz(), hs, t.id, r)}</span></div>`).join("");
   return `<p class="hint">Tippen: 1× richtig, 2× richtig + Zusatzpunkt, 3× falsch. Grüner Strich = automatischer Vorschlag. Beim Schließen der Runde werden die Vorschläge übernommen.</p>
     <button data-a2="suggest">Vorschläge neu übernehmen</button>${blocks}<div class="gradeq"><b>Summe dieser Runde</b>${sums}</div>`;
 }

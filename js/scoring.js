@@ -53,11 +53,12 @@ export const rightText = item => {
   return String(item.answer ?? "");
 };
 
-// marks[team][round][item] = [0|1|2, ...], bonus[team][round] = Zahl
+// marks[team][round][item] = [0|1|2, ...], bonus[team][round] = Zahl, jokers[team] = Runden-ID
 export function roundPoints(quiz, st, teamId, round) {
   const m = st.marks?.[teamId]?.[round.id] || {};
   let p = 0;
   for (const it of round.items) if (counts(it)) for (const v of m[it.id] || []) p += Math.min(2, Number(v) || 0);
+  if (st.jokers?.[teamId] === round.id) p *= 2; // Joker: Fragenpunkte der Runde zählen doppelt
   return p + (Number(st.bonus?.[teamId]?.[round.id]) || 0);
 }
 
