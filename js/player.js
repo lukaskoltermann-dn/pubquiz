@@ -56,7 +56,7 @@ function watchAnswers(rid) {
   }, () => {});
 }
 
-const open = () => game && ["question", "answering"].includes(game.phase) && (!game.deadline || Date.now() < game.deadline + 3000);
+const open = () => game && game.phase === "answering" && (!game.deadline || Date.now() < game.deadline + 3000);
 
 function save() {
   try { localStorage.setItem(`pq-a-${code}-${ansRound}`, JSON.stringify(answers)); } catch {}
@@ -125,8 +125,10 @@ function render() {
   [...list.children].forEach(c => { if (!qs.some(q => "q-" + q.id === c.id)) c.remove(); });
   fillInputs();
   const last = list.lastElementChild; if (last && last.dataset.seen !== "1") { last.dataset.seen = "1"; if (qs.length > 1) last.scrollIntoView({ behavior: "smooth", block: "center" }); }
-  $("foot").textContent = ph === "locked" ? "Die Runde ist geschlossen. Eure Antworten sind beim Moderator." : qs.length ? "Antworten werden automatisch gespeichert. Ihr könnt bis zum Ende der Zeit noch ändern." : "Gleich kommt die erste Frage.";
+  $("foot").textContent = ph === "locked" ? "Die Runde ist geschlossen. Eure Antworten sind beim Moderator." : ph === "question" ? (qs.length ? "Hört gut zu, die Fragen stehen hier zum Mitlesen. Antworten könnt ihr, sobald die Antwortzeit startet." : "Gleich kommt die erste Frage.") : "Antworten werden automatisch gespeichert. Ihr könnt bis zum Ende der Zeit noch ändern.";
   if (ph === "locked") $("st").textContent = "Abgegeben ✓";
+  else if (ph === "question") $("st").textContent = "Zuhören! Antworten geht gleich los.";
+  else if (!Object.keys(answers).length) $("st").textContent = "Jetzt antworten!";
   const t = $("timer");
   if (game.deadline && ph === "answering") {
     t.hidden = false;

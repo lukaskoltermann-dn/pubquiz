@@ -205,13 +205,18 @@ async function act(a) {
     const qs = r.items.map((it, i) => publicItem(it, r.items.slice(0, i + 1).filter(x => x.type !== "estimate").length));
     hs.released = r.items.length; saveHs(); await pub({ questions: qs });
   }
-  if (a === "timer") { const m = Math.max(1, +($("mins")?.value || 10)); await pub({ phase: "answering", deadline: Date.now() + m * 60000 }); }
+  if (a === "timer") {
+    const m = Math.max(1, +($("mins")?.value || 10));
+    const qs = r.items.map((it, i) => publicItem(it, r.items.slice(0, i + 1).filter(x => x.type !== "estimate").length));
+    hs.released = r.items.length; saveHs();
+    await pub({ phase: "answering", deadline: Date.now() + m * 60000, questions: qs });
+  }
   if (a === "plus1") await pub({ deadline: Math.max(game.deadline || Date.now(), Date.now()) + 60000 });
   if (a === "lock") {
     await pub({ phase: "locked", deadline: 0 });
     applySuggestions(false); view = "grade";
   }
-  if (a === "reopen") await pub({ phase: "question", deadline: 0 });
+  if (a === "reopen") await pub({ phase: "answering", deadline: 0 });
   if (a === "results") await pub({ phase: "results", board: board(), boardRound: game.roundIdx });
   if (a === "final") await pub({ phase: "final", board: board(), boardRound: game.roundIdx, reveal: 0 });
   if (a === "reveal") await pub({ reveal: Math.min((game.reveal || 0) + 1, teams.length) });
@@ -242,8 +247,9 @@ function renderLive() {
   if (ph === "lobby") ctrl = `<p>Die Teams melden sich gerade an. Wenn alle da sind:</p><button class="main" data-a="startRound">Runde 1 starten</button>`;
   else if (ph === "question" || ph === "answering") {
     const rel = hs.released || 0, next = r.items[rel];
-    ctrl = `<div class="row2">${next ? `<button class="main" data-a="release">${esc(itemLabel(r, rel))} freigeben</button><button data-a="releaseAll">Alle auf einmal</button>` : `<span class="okc">Alle Fragen sind freigegeben.</span>`}</div>
-      <div class="row2">${ph === "answering" ? `<span class="pill timer big" id="htimer">${until(game.deadline - Date.now())}</span><button data-a="plus1">+1 Minute</button>` : `<label style="width:110px">Minuten<input id="mins" type="number" min="1" value="10"></label><button data-a="timer" style="align-self:end">Antwortzeit starten</button>`}
+    ctrl = `<div class="row2">${ph === "answering" ? `<span class="okc">Antwortzeit läuft, die Teams können jetzt antworten.</span>` : next ? `<button class="main" data-a="release">${esc(itemLabel(r, rel))} freigeben</button><button data-a="releaseAll">Alle auf einmal</button>` : `<span class="okc">Alle Fragen sind vorgelesen. Jetzt die Antwortzeit starten.</span>`}</div>
+      ${ph === "question" ? `<p class="hint">Die Teams sehen die Fragen zum Mitlesen, antworten können sie erst, wenn die Antwortzeit läuft.</p>` : ""}
+      <div class="row2">${ph === "answering" ? `<span class="pill timer big" id="htimer">${until(game.deadline - Date.now())}</span><button data-a="plus1">+1 Minute</button>` : `<label style="width:110px">Minuten<input id="mins" type="number" min="1" value="10"></label><button class="main" data-a="timer" style="align-self:end">Antwortzeit starten</button>`}
       <button class="red" data-a="lock" style="align-self:end">Runde schließen</button></div>`;
   } else if (ph === "locked") ctrl = `<p>Runde geschlossen. Prüfe unten die Antworten, dann:</p><div class="row2"><button class="main" data-a="${last ? "final" : "results"}">${last ? "Siegerehrung starten" : "Stand auf Beamer zeigen"}</button><button data-a="reopen">Runde wieder öffnen</button></div>`;
   else if (ph === "results") ctrl = `<p>Der Stand nach Runde ${game.roundIdx + 1} ist auf dem Beamer und den Handys.</p><div class="row2">${last ? `<button class="main" data-a="final">Siegerehrung starten</button>` : `<button class="main" data-a="nextRound">Runde ${game.roundIdx + 2} starten</button>`}<button data-a="results">Stand aktualisieren</button></div>`;
