@@ -144,7 +144,7 @@ async function startGame(q) {
   for (let i = 0; i < 10; i++) { c = Array.from({ length: 5 }, () => A[Math.floor(Math.random() * A.length)]).join(""); if (!(await getDoc(doc(db, "games", c))).exists()) break; }
   const quiz = JSON.parse(JSON.stringify(q));
   await setDoc(doc(db, "games", c), { ownerUid: user.uid, title: quiz.title, phase: "lobby", roundIdx: -1, roundId: "", roundName: "", questions: [], deadline: 0, board: [], boardRound: -1, reveal: 0, teamNames: [], roundCount: quiz.rounds.length, createdAt: Date.now() });
-  await setDoc(doc(db, "games", c, "host", "state"), { quiz, marks: {}, bonus: {}, released: 0 });
+  await setDoc(doc(db, "games", c, "host", "state"), { quiz, marks: {}, bonus: {}, relIds: [] });
   localStorage.setItem(LSG, c);
   editing = null; openLive(c);
 }
@@ -185,6 +185,13 @@ function estimateInfo() {
 const board = () => ranking(quiz(), hs, teams, estimateInfo()).map(r => ({ id: r.id, name: r.name, total: r.total, place: r.place }));
 const publicItem = (it, n) => it.type === "music" ? { id: it.id, type: "music", n, text: "" } : it.type === "mc" ? { id: it.id, type: "mc", n, text: it.text, options: it.options } : { id: it.id, type: it.type, n, text: it.text };
 
+const relIds = r => hs.relIds || r.items.slice(0, hs.released || 0).map(it => it.id);
+const publicList = r => r.items.map((it, i) => [it, i]).filter(([it]) => relIds(r).includes(it.id)).map(([it, i]) => publicItem(it, r.items.slice(0, i + 1).filter(x => x.type !== "estimate").length));
+async function releaseItem(id, all = false) {
+  const r = curRound();
+  hs.relIds = all ? r.items.map(it => it.id) : [...new Set([...relIds(r), id])]; saveHs();
+  await pub({ questions: publicList(r), currentId: all ? (game.currentId || "") : id });
+}
 function itemLabel(r, idx) { const it = r.items[idx]; if (it.type === "estimate") return "Schätzfrage"; const n = r.items.slice(0, idx + 1).filter(x => x.type !== "estimate").length; return it.type === "music" ? `Lied ${n}` : `Frage ${n}`; }
 
 // ---------- Aktionen ----------
@@ -192,24 +199,15 @@ async function act(a) {
   const r = curRound(), last = game.roundIdx >= quiz().rounds.length - 1;
   if (a === "startRound" || a === "nextRound") {
     const i = a === "startRound" ? 0 : game.roundIdx + 1, nr = quiz().rounds[i];
-    hs.released = 0; saveHs();
-    await pub({ phase: "question", roundIdx: i, roundId: nr.id, roundName: nr.name, questions: [], deadline: 0 });
+    hs.relIds = []; saveHs();
+    await pub({ phase: "question", roundIdx: i, roundId: nr.id, roundName: nr.name, questions: [], currentId: "", deadline: 0 });
   }
-  if (a === "release") {
-    const idx = hs.released || 0; if (idx >= r.items.length) return;
-    const n = r.items.slice(0, idx + 1).filter(x => x.type !== "estimate").length;
-    hs.released = idx + 1; saveHs();
-    await pub({ questions: [...(game.questions || []), publicItem(r.items[idx], n)] });
-  }
-  if (a === "releaseAll") {
-    const qs = r.items.map((it, i) => publicItem(it, r.items.slice(0, i + 1).filter(x => x.type !== "estimate").length));
-    hs.released = r.items.length; saveHs(); await pub({ questions: qs });
-  }
+  if (a === "release") { const next = r.items.find(it => !relIds(r).includes(it.id)); if (next) await releaseItem(next.id); }
+  if (a === "releaseAll") await releaseItem(null, true);
   if (a === "timer") {
     const m = Math.max(1, +($("mins")?.value || 10));
-    const qs = r.items.map((it, i) => publicItem(it, r.items.slice(0, i + 1).filter(x => x.type !== "estimate").length));
-    hs.released = r.items.length; saveHs();
-    await pub({ phase: "answering", deadline: Date.now() + m * 60000, questions: qs });
+    hs.relIds = r.items.map(it => it.id); saveHs();
+    await pub({ phase: "answering", deadline: Date.now() + m * 60000, questions: publicList(r) });
   }
   if (a === "plus1") await pub({ deadline: Math.max(game.deadline || Date.now(), Date.now()) + 60000 });
   if (a === "lock") {
@@ -246,7 +244,7 @@ function renderLive() {
   let ctrl = "";
   if (ph === "lobby") ctrl = `<p>Die Teams melden sich gerade an. Wenn alle da sind:</p><button class="main" data-a="startRound">Runde 1 starten</button>`;
   else if (ph === "question" || ph === "answering") {
-    const rel = hs.released || 0, next = r.items[rel];
+    const nextIdx = r.items.findIndex(it => !relIds(r).includes(it.id)), next = r.items[nextIdx], rel = nextIdx;
     ctrl = `<div class="row2">${ph === "answering" ? `<span class="okc">Antwortzeit läuft, die Teams können jetzt antworten.</span>` : next ? `<button class="main" data-a="release">${esc(itemLabel(r, rel))} freigeben</button><button data-a="releaseAll">Alle auf einmal</button>` : `<span class="okc">Alle Fragen sind vorgelesen. Jetzt die Antwortzeit starten.</span>`}</div>
       ${ph === "question" ? `<p class="hint">Die Teams sehen die Fragen zum Mitlesen, antworten können sie erst, wenn die Antwortzeit läuft.</p>` : ""}
       <div class="row2">${ph === "answering" ? `<span class="pill timer big" id="htimer">${until(game.deadline - Date.now())}</span><button data-a="plus1">+1 Minute</button>` : `<label style="width:110px">Minuten<input id="mins" type="number" min="1" value="10"></label><button class="main" data-a="timer" style="align-self:end">Antwortzeit starten</button>`}
@@ -255,7 +253,10 @@ function renderLive() {
   else if (ph === "results") ctrl = `<p>Der Stand nach Runde ${game.roundIdx + 1} ist auf dem Beamer und den Handys.</p><div class="row2">${last ? `<button class="main" data-a="final">Siegerehrung starten</button>` : `<button class="main" data-a="nextRound">Runde ${game.roundIdx + 2} starten</button>`}<button data-a="results">Stand aktualisieren</button></div>`;
   else if (ph === "final") ctrl = `<p>${(game.reveal || 0) < teams.length ? `${game.reveal || 0} von ${teams.length} Plätzen aufgedeckt.` : "Alle Plätze aufgedeckt. Glückwunsch!"}</p><div class="row2"><button class="main" data-a="reveal" ${(game.reveal || 0) >= teams.length ? "disabled" : ""}>Nächsten Platz aufdecken</button><button data-a="final">Neu berechnen</button></div>`;
 
-  const script = r ? r.items.map((it, i) => `<div class="script${i < (hs.released || 0) ? " done" : ""}"><span class="qnum">${esc(itemLabel(r, i))}${i < (hs.released || 0) ? " · freigegeben" : ""}</span><br>${it.type === "music" ? "" : esc(it.text)}${it.type === "mc" ? `<br><span class="hint">${it.options.map((o, k) => `${"abcdefgh"[k]}) ${esc(o)}`).join(" · ")}</span>` : ""}<br><span class="right">${esc(rightText(it))}</span>${it.note ? `<br><span class="hint">${esc(it.note)}</span>` : ""}</div>`).join("") : "";
+  const rids = r ? relIds(r) : [], nextId = r?.items.find(it => !rids.includes(it.id))?.id;
+  const script = r ? r.items.map((it, i) => { const done = rids.includes(it.id), canRel = ph === "question" && !done;
+    return `<div class="script${done ? " done" : ""}"><div class="row2" style="justify-content:space-between;align-items:flex-start;flex-wrap:nowrap"><span class="qnum">${esc(itemLabel(r, i))}${done ? " · freigegeben ✓" : ""}</span>${canRel ? `<button class="${it.id === nextId ? "main" : ""}" data-rel="${esc(it.id)}" style="flex:none">Freigeben</button>` : ""}</div>${it.type === "music" ? "" : esc(it.text)}${it.type === "mc" ? `<br><span class="hint">${it.options.map((o, k) => `${"abcdefgh"[k]}) ${esc(o)}`).join(" · ")}</span>` : ""}<br><span class="right">${esc(rightText(it))}</span>${it.note ? `<br><span class="hint">${esc(it.note)}</span>` : ""}</div>`; }).join("")
+    + (ph === "question" ? `<div class="row2"><button class="main" data-a="timer">Antwortzeit starten</button><span class="hint">Dauer wie oben eingestellt</span></div>` : "") : "";
 
   const answered = r ? Object.keys(answers[r.id] || {}).length : 0;
   const rows = ranking(quiz(), hs, teams, estimateInfo());
@@ -297,6 +298,7 @@ app.addEventListener("click", async e => {
   const b = e.target.closest("button"); if (!b) return;
   if (b.dataset.a) { b.disabled = true; await act(b.dataset.a); return; }
   if (b.dataset.v) { view = b.dataset.v; return renderLive(); }
+  if (b.dataset.rel) { b.disabled = true; await releaseItem(b.dataset.rel); return; }
   if (b.dataset.a2 === "suggest") { applySuggestions(true); return renderLive(); }
   if (b.dataset.kick) { if (b.textContent !== "Entfernen?") { b.textContent = "Entfernen?"; return; } await deleteDoc(doc(db, "games", code, "teams", b.dataset.kick)); return; }
   if (b.dataset.mark) {

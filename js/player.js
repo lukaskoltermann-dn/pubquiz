@@ -124,7 +124,10 @@ function render() {
   });
   [...list.children].forEach(c => { if (!qs.some(q => "q-" + q.id === c.id)) c.remove(); });
   fillInputs();
-  const last = list.lastElementChild; if (last && last.dataset.seen !== "1") { last.dataset.seen = "1"; if (qs.length > 1) last.scrollIntoView({ behavior: "smooth", block: "center" }); }
+  // neue Fragen in der Reihenfolge des Skripts einsortieren und zur aktuellen springen
+  if ([...list.children].map(c => c.id).join() !== qs.map(q => "q-" + q.id).join()) qs.forEach(q => { const c = $("q-" + q.id); if (c) list.appendChild(c); });
+  const cur = game.currentId && $("q-" + game.currentId);
+  if (cur && list.dataset.cur !== game.currentId) { list.dataset.cur = game.currentId; if (qs.length > 1) cur.scrollIntoView({ behavior: "smooth", block: "center" }); }
   $("foot").textContent = ph === "locked" ? "Die Runde ist geschlossen. Eure Antworten sind beim Moderator." : ph === "question" ? (qs.length ? "Hört gut zu, die Fragen stehen hier zum Mitlesen. Antworten könnt ihr, sobald die Antwortzeit startet." : "Gleich kommt die erste Frage.") : "Antworten werden automatisch gespeichert. Ihr könnt bis zum Ende der Zeit noch ändern.";
   if (ph === "locked") $("st").textContent = "Abgegeben ✓";
   else if (ph === "question") $("st").textContent = "Zuhören! Antworten geht gleich los.";

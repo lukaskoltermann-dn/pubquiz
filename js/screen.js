@@ -16,7 +16,7 @@ function render() {
   }
   const rsub = g.roundIdx >= 0 ? `Runde ${g.roundIdx + 1} von ${g.roundCount}: ${esc(g.roundName)}` : "";
   if (ph === "question" || ph === "answering" || ph === "locked") {
-    const qs = g.questions || [], q = qs[qs.length - 1];
+    const qs = g.questions || [], q = qs.find(x => x.id === g.currentId) || qs[qs.length - 1];
     let body = "";
     if (ph === "locked") body = `<div class="q"><div class="txt slab">Runde geschlossen.</div><div class="rn">Die Antworten werden ausgewertet.</div></div>`;
     else if (ph === "answering") body = `<div class="q"><div class="lab">Antwortzeit</div><div class="tm slab" id="tm"></div><div class="rn">${qs.length} ${qs.length === 1 ? "Frage" : "Fragen"} auf euren Handys. Ändern geht bis zum Ende der Zeit.</div></div>`;
