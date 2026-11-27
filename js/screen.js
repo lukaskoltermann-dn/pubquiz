@@ -1,4 +1,4 @@
-import { ready, auth, db, signInAnonymously, onAuthStateChanged, doc, onSnapshot, $, esc, params, until } from "./fb.js?v=20261127c";
+import { ready, auth, db, signInAnonymously, onAuthStateChanged, doc, onSnapshot, $, esc, params, until } from "./fb.js?v=20261127d";
 
 const s = $("s"), code = (params.get("g") || "").toUpperCase();
 let game = null, tick = null;
@@ -20,7 +20,7 @@ function render() {
   }
   const rsub = g.roundIdx >= 0 ? `Runde ${g.roundIdx + 1} von ${g.roundCount}: ${esc(g.roundName)}` : "";
   const pl = g.playing;
-  if (ph === "question" && pl && pl.until > Date.now()) {
+  if ((ph === "question" || ph === "answering") && pl && pl.until > Date.now()) {
     const bars = Array.from({ length: 28 }, (_, i) => `<i style="animation-delay:${(-((i * 37) % 100) / 100).toFixed(2)}s;animation-duration:${(0.55 + ((i * 13) % 7) / 10).toFixed(2)}s"></i>`).join("");
     s.innerHTML = head(`Runde ${g.roundIdx + 1} von ${g.roundCount}: ${esc(g.roundName)}`) + `<div class="onair"><div class="lab">Lied ${pl.n}</div>
       <div class="ring"><svg viewBox="0 0 120 120" aria-hidden="true"><circle cx="60" cy="60" r="54" class="bg"/><circle cx="60" cy="60" r="54" class="fg" id="arc"/></svg><span id="cd"></span></div>
