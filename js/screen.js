@@ -1,4 +1,4 @@
-import { ready, auth, db, signInAnonymously, onAuthStateChanged, doc, onSnapshot, $, esc, params, until } from "./fb.js?v=20261127d";
+import { ready, auth, db, signInAnonymously, onAuthStateChanged, doc, onSnapshot, $, esc, params, until } from "./fb.js?v=20261127e";
 
 const s = $("s"), code = (params.get("g") || "").toUpperCase();
 let game = null, tick = null;

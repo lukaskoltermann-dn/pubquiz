@@ -4,8 +4,9 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Kolties QuizKasten · Beamer</title>
+<script>/* Update-Check: lädt neu, sobald eine neuere Version online ist */const APPV="20261127e";fetch("version.txt?"+Date.now(),{cache:"no-store"}).then(r=>r.ok?r.text():"").then(t=>{t=t.trim();if(t&&t!==APPV){const u=new URL(location.href);if(u.searchParams.get("v")!==t){u.searchParams.set("v",t);location.replace(u)}}}).catch(()=>{});</script>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bungee&family=Outfit:wght@400;500;600;700&display=swap">
-<link rel="stylesheet" href="css/style.css?v=20261127d">
+<link rel="stylesheet" href="css/style.css?v=20261127e">
 <style>
 html,body{height:100%}
 #s{min-height:100%;display:flex;flex-direction:column;padding:clamp(16px,3vw,48px);gap:clamp(12px,2vw,28px);position:relative;overflow:hidden}
@@ -58,6 +59,6 @@ html,body{height:100%}
 <body>
 <div id="s"><p>Wird geladen…</p></div>
 <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.js"></script>
-<script type="module" src="js/screen.js?v=20261127d"></script>
+<script type="module" src="js/screen.js?v=20261127e"></script>
 </body>
 </html>

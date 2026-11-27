@@ -1,6 +1,6 @@
-import { ready, auth, db, signInWithEmailAndPassword, signOut, onAuthStateChanged, doc, getDoc, setDoc, updateDoc, deleteDoc, onSnapshot, collection, getDocs, $, esc, keepEmu, until } from "./fb.js?v=20261127d";
-import { docxToQuiz, uid } from "./importer.js?v=20261127d";
-import { slots, counts, suggest, answerText, rightText, roundPoints, total, ranking } from "./scoring.js?v=20261127d";
+import { ready, auth, db, signInWithEmailAndPassword, signOut, onAuthStateChanged, doc, getDoc, setDoc, updateDoc, deleteDoc, onSnapshot, collection, getDocs, $, esc, keepEmu, until } from "./fb.js?v=20261127e";
+import { docxToQuiz, uid } from "./importer.js?v=20261127e";
+import { slots, counts, suggest, answerText, rightText, roundPoints, total, ranking } from "./scoring.js?v=20261127e";
 
 const app = $("app");
 const toast = m => { const t = $("toast"); t.textContent = m; t.style.display = "block"; clearTimeout(toast.t); toast.t = setTimeout(() => t.style.display = "none", 3500); };
