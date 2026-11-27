@@ -10,9 +10,10 @@ const saved = () => { try { return JSON.parse(localStorage.getItem(LS)) || {}; }
 
 function joinForm(msg = "") {
   const s = saved();
-  app.innerHTML = `<form class="panel stack" id="join">
+  app.innerHTML = `<div class="panel welcome" style="margin-bottom:14px"><div class="bubble">Servus! Code vom Beamer eintippen, Teamname dazu, und schon seid ihr im Spiel.</div><img class="host-pic" src="img/kolti-bust.webp" alt="Quizmaster Kolti"></div>
+  <form class="panel stack" id="join">
     <h2 class="slab big">Mitspielen</h2>
-    <p class="hint">Gebt den Code vom Beamer ein und euren Teamnamen. Ein Handy pro Team reicht.</p>
+    <p class="hint">Ein Handy pro Team reicht.</p>
     <label>Spiel-Code<input id="code" autocomplete="off" autocapitalize="characters" maxlength="6" value="${esc(code || s.code || "")}" placeholder="z. B. KNEIPE"></label>
     <label>Teamname<input id="name" maxlength="40" autocomplete="off" value="${esc(s.name || "")}" placeholder="z. B. Die Musikalischen Pinguine"></label>
     ${msg ? `<p class="err">${esc(msg)}</p>` : ""}
@@ -94,10 +95,10 @@ function boardHtml(rows, hidden = 0) {
 }
 
 function render() {
-  $("title").textContent = game.title || "Pubquiz";
+  $("title").textContent = game.title || "";
   clearInterval(tick);
   const ph = game.phase;
-  if (ph === "lobby") { app.innerHTML = `<div class="panel stack"><h2 class="slab big">Ihr seid dabei!</h2><p>Team <b>${esc(team)}</b> ist angemeldet. Gleich geht's los, die Fragen erscheinen hier automatisch.</p></div>`; return; }
+  if (ph === "lobby") { app.innerHTML = `<div class="panel welcome"><div class="stack"><h2 class="slab big">Ihr seid dabei!</h2><div class="bubble">Willkommen, ${esc(team)}! Gleich geht's los, die Fragen erscheinen hier automatisch.</div></div><img class="host-pic" src="img/kolti-bust.webp" alt="Quizmaster Kolti"></div>`; return; }
   if (ph === "results" || ph === "final") {
     const rows = game.board || [], hidden = ph === "final" ? Math.max(0, rows.length - (game.reveal || 0)) : 0;
     const mine = rows.find(r => r.id === (game.alias?.[me] || me));

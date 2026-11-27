@@ -1,4 +1,4 @@
-# Pubquiz live
+# Kolties QuizKasten
 
 Teams spielen per Smartphone mit, der Moderator steuert alles vom Laptop, der Beamer zeigt Fragen und Rangliste.
 
