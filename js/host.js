@@ -1,7 +1,7 @@
-import { ready, auth, db, signInWithEmailAndPassword, signOut, onAuthStateChanged, doc, getDoc, setDoc, updateDoc, deleteDoc, onSnapshot, collection, getDocs, $, esc, keepEmu, until, hydrate, imgSrc } from "./fb.js?v=20261127g";
-import * as fx from "./fx.js?v=20261127g";
-import { docxToQuiz, uid } from "./importer.js?v=20261127g";
-import { slots, counts, suggest, answerText, rightText, roundPoints, total, ranking } from "./scoring.js?v=20261127g";
+import { ready, auth, db, signInWithEmailAndPassword, signOut, onAuthStateChanged, doc, getDoc, setDoc, updateDoc, deleteDoc, onSnapshot, collection, getDocs, $, esc, keepEmu, until, hydrate, imgSrc } from "./fb.js?v=20261127h";
+import * as fx from "./fx.js?v=20261127h";
+import { docxToQuiz, uid } from "./importer.js?v=20261127h";
+import { slots, counts, suggest, answerText, rightText, roundPoints, total, ranking } from "./scoring.js?v=20261127h";
 
 const app = $("app");
 const toast = m => { const t = $("toast"); t.textContent = m; t.style.display = "block"; clearTimeout(toast.t); toast.t = setTimeout(() => t.style.display = "none", 3500); };
@@ -494,7 +494,7 @@ function renderLive() {
       <button data-a="solPrev" ${so.idx ? "" : "disabled"}>Zurück</button>${so.shown && !end ? `<button data-a="${last ? "final" : "results"}">${last ? "Zur Siegerehrung" : "Zum Stand"}</button>` : ""}</div>
       <p class="hint">Die Statistik kommt aus deinen Haken unter „Antworten prüfen“. Korrigierst du dort etwas, drück einfach noch mal „Lösung aufdecken“.</p>`;
   }
-  else if (ph === "results") ctrl = `<p>Der Stand nach Runde ${game.roundIdx + 1} ist auf dem Beamer und den Handys.</p><div class="row2">${last ? `<button class="main" data-a="final">Siegerehrung starten</button>` : `<button class="main" data-a="nextRound">Runde ${game.roundIdx + 2} starten</button>`}<button data-a="results">Stand aktualisieren</button></div>`;
+  else if (ph === "results") ctrl = `<p>Der Stand nach Runde ${game.roundIdx + 1} ist auf dem Beamer und den Handys.</p><div class="row2">${last ? `<button class="main" data-a="final">Siegerehrung starten</button>` : `<button class="main" data-a="nextRound">Runde ${game.roundIdx + 2} starten</button>`}<button data-a="results">Stand aktualisieren</button>${last ? "" : `<button class="red" data-a2="early">Hier beenden: Siegerehrung</button>`}</div>${last ? "" : (() => { const ri = quiz().rounds.findIndex(r => r.items.some(it => it.type === "estimate")); return ri > game.roundIdx ? `<p class="hint">Hinweis: Die Schätzfrage steht in Runde ${ri + 1}. Beendest du vorher, entscheidet sie einen Gleichstand auf Platz 1 nicht.</p>` : ""; })()}`;
   if (ph === "solve" && game.sol?.shown) ctrl = ctrl.replace(`<button data-a="solPrev"`, `<button data-a="solShow">Neu laden</button><button data-a="solPrev"`);
   if (ph === "final") ctrl = `<p>${(game.reveal || 0) < teams.length ? `${game.reveal || 0} von ${teams.length} Plätzen aufgedeckt.` : "Alle Plätze aufgedeckt. Glückwunsch!"}</p><div class="row2"><button class="main" data-a="reveal" ${(game.reveal || 0) >= teams.length ? "disabled" : ""}>Nächsten Platz aufdecken</button><button data-a="final">Neu berechnen</button></div>`;
 
@@ -547,6 +547,7 @@ app.addEventListener("click", async e => {
   if (b.dataset.play) { const it = curRound().items.find(x => x.id === b.dataset.play); if (it) playClip(it); return; }
   if (b.dataset.stop) { stopClip(); return; }
   if (b.dataset.rel) { b.disabled = true; await releaseItem(b.dataset.rel); return; }
+  if (b.dataset.a2 === "early") { if (b.textContent !== "Wirklich jetzt beenden?") { b.textContent = "Wirklich jetzt beenden?"; return; } b.disabled = true; await act("final"); return; }
   if (b.dataset.a2 === "suggest") { applySuggestions(true); return renderLive(); }
   if (b.dataset.merge) { const [n, o] = b.dataset.merge.split("|"); b.disabled = true; await mergeTeam(n, o); return; }
   if (b.dataset.kick) { if (b.textContent !== "Entfernen?") { b.textContent = "Entfernen?"; return; } await deleteDoc(doc(db, "games", code, "teams", b.dataset.kick)); return; }

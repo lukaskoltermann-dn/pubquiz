@@ -24,7 +24,7 @@ Teams spielen per Smartphone mit, der Moderator steuert alles vom Laptop, der Be
 4. Pro Runde: Fragen beim Vorlesen einzeln freigeben → „Antwortzeit starten“ → „Runde schließen“.
 5. Unter „Antworten prüfen“ die Vorschläge kontrollieren (1× tippen richtig, 2× mit Zusatzpunkt, 3× falsch).
 6. „Auflösung auf dem Beamer“: Frage für Frage „Lösung aufdecken“, mit Statistik (wie viele Teams richtig lagen, welche Antwort gewählt wurde, Schätzungen auf dem Zahlenstrahl). Danach „Stand auf Beamer zeigen“: die Rangliste fährt vom alten in den neuen Stand, mit Aufsteiger-Pfeilen.
-7. Nach der letzten Runde „Siegerehrung starten“ und Platz für Platz aufdecken. Vor Platz 1 kommt ein Trommelwirbel, dann Fanfare und Konfetti. Gleichstand auf Platz 1 entscheidet die Schätzfrage.
+7. Nach der letzten Runde „Siegerehrung starten“ und Platz für Platz aufdecken. Vor Platz 1 kommt ein Trommelwirbel, dann Fanfare und Konfetti. Gleichstand auf Platz 1 entscheidet die Schätzfrage. Wer früher aufhören will, drückt nach dem Zwischenstand „Hier beenden: Siegerehrung“ (zweimal klicken zum Bestätigen).
 
 ## Generalprobe
 
