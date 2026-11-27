@@ -7,7 +7,7 @@ const toast = m => { const t = $("toast"); t.textContent = m; t.style.display = 
 const LSG = "pq-host-game";
 let user = null, quizzes = [], editing = null, editT = null;
 // Live-Spiel
-let code = null, game = null, hs = null, teams = [], answers = {}, subs = [], hsT = null, tick = null, view = "round";
+let code = null, game = null, hs = null, teams = [], allTeams = [], raw = {}, subs = [], hsT = null, tick = null, view = "round";
 
 // ---------- Anmeldung ----------
 function login(msg = "") {
@@ -152,24 +152,44 @@ async function startGame(q) {
 function stopLive() { subs.forEach(u => u()); subs = []; clearInterval(tick); code = null; game = null; hs = null; }
 
 async function openLive(c) {
-  stopLive(); code = c; teams = []; answers = {};
+  stopLive(); code = c; teams = []; allTeams = []; raw = {};
   const h = await getDoc(doc(db, "games", c, "host", "state")).catch(() => null);
   if (!h || !h.exists()) { localStorage.removeItem(LSG); toast("Diesen Abend gibt es nicht mehr."); return home(); }
   hs = h.data();
   subs.push(onSnapshot(doc(db, "games", c), s => { if (!s.exists()) return; game = s.data(); renderLive(); }));
   subs.push(onSnapshot(collection(db, "games", c, "teams"), s => {
-    teams = s.docs.map(d => ({ id: d.id, name: d.data().name, at: d.data().at })).sort((a, b) => a.at - b.at);
+    allTeams = s.docs.map(d => ({ id: d.id, name: d.data().name, at: d.data().at })).sort((a, b) => a.at - b.at);
+    refreshTeams();
     const names = teams.map(t => t.name);
     if (game && JSON.stringify(names) !== JSON.stringify(game.teamNames || [])) pub({ teamNames: names });
     renderLive();
   }));
   subs.push(onSnapshot(collection(db, "games", c, "answers"), s => {
-    s.docChanges().forEach(ch => { const d = ch.doc.data(); answers[d.round] ||= {}; if (ch.type === "removed") delete answers[d.round][d.uid]; else answers[d.round][d.uid] = d.a || {}; });
+    s.docChanges().forEach(ch => { const d = ch.doc.data(); raw[d.round] ||= {}; if (ch.type === "removed") delete raw[d.round][d.uid]; else raw[d.round][d.uid] = { a: d.a || {}, at: d.at || 0 }; });
     renderLive();
   }));
   tick = setInterval(() => { const t = $("htimer"); if (t && game?.deadline) { const l = game.deadline - Date.now(); t.textContent = l > 0 ? until(l) : "Zeit um"; } }, 500);
 }
 
+// Handywechsel: neue Handy-IDs zeigen auf das ursprüngliche Team
+const eff = id => { let x = id, n = 0; while (hs?.alias?.[x] && n++ < 10) x = hs.alias[x]; return x; };
+function refreshTeams() { teams = allTeams.filter(t => eff(t.id) === t.id); }
+// Antworten einer Runde je Team (bei mehreren Handys: neuere Antworten gewinnen)
+function roundAnswers(rid) {
+  const out = {};
+  Object.entries(raw[rid] || {}).sort((a, b) => a[1].at - b[1].at).forEach(([uid, v]) => { const t = eff(uid); out[t] = { ...(out[t] || {}), ...v.a }; });
+  return out;
+}
+const norm = s => String(s || "").toLowerCase().replace(/\s+/g, " ").trim();
+function dupeOf(t) { return teams.find(o => o.id !== t.id && o.at < t.at && norm(o.name) === norm(t.name)); }
+async function mergeTeam(newId, oldId) {
+  hs.alias ||= {}; hs.alias[newId] = oldId;
+  await setDoc(doc(db, "games", code, "host", "state"), hs);
+  refreshTeams();
+  await pub({ alias: hs.alias, teamNames: teams.map(t => t.name) });
+  toast("Zusammengeführt. Das neue Handy spielt jetzt für das alte Team.");
+  renderLive();
+}
 const pub = data => updateDoc(doc(db, "games", code), data).catch(e => { console.error(e); toast("Konnte nicht speichern. Internet?"); });
 function saveHs() { clearTimeout(hsT); hsT = setTimeout(() => setDoc(doc(db, "games", code, "host", "state"), hs).catch(() => toast("Punkte nicht gespeichert. Internet?")), 500); }
 
@@ -177,7 +197,7 @@ const quiz = () => hs.quiz;
 const curRound = () => quiz().rounds[game.roundIdx];
 function estimateInfo() {
   for (const r of quiz().rounds) for (const it of r.items) if (it.type === "estimate") {
-    const guesses = {}; for (const [t, a] of Object.entries(answers[r.id] || {})) if (a[it.id] !== undefined) guesses[t] = a[it.id];
+    const guesses = {}; for (const [t, a] of Object.entries(roundAnswers(r.id))) if (a[it.id] !== undefined) guesses[t] = a[it.id];
     return { item: it, answer: it.answer, guesses };
   }
   return null;
@@ -225,7 +245,7 @@ async function act(a) {
 function applySuggestions(overwrite) {
   const r = curRound(); if (!r) return;
   for (const t of teams) {
-    const a = answers[r.id]?.[t.id] || {};
+    const a = roundAnswers(r.id)[t.id] || {};
     hs.marks[t.id] ||= {}; const m = hs.marks[t.id][r.id] ||= {};
     for (const it of r.items) if (counts(it) && (overwrite || !m[it.id])) m[it.id] = suggest(it, a[it.id]);
   }
@@ -258,7 +278,7 @@ function renderLive() {
     return `<div class="script${done ? " done" : ""}"><div class="row2" style="justify-content:space-between;align-items:flex-start;flex-wrap:nowrap"><span class="qnum">${esc(itemLabel(r, i))}${done ? " · freigegeben ✓" : ""}</span>${canRel ? `<button class="${it.id === nextId ? "main" : ""}" data-rel="${esc(it.id)}" style="flex:none">Freigeben</button>` : ""}</div>${it.type === "music" ? "" : esc(it.text)}${it.type === "mc" ? `<br><span class="hint">${it.options.map((o, k) => `${"abcdefgh"[k]}) ${esc(o)}`).join(" · ")}</span>` : ""}<br><span class="right">${esc(rightText(it))}</span>${it.note ? `<br><span class="hint">${esc(it.note)}</span>` : ""}</div>`; }).join("")
     + (ph === "question" ? `<div class="row2"><button class="main" data-a="timer">Antwortzeit starten</button><span class="hint">Dauer wie oben eingestellt</span></div>` : "") : "";
 
-  const answered = r ? Object.keys(answers[r.id] || {}).length : 0;
+  const answered = r ? Object.keys(roundAnswers(r.id)).length : 0;
   const rows = ranking(quiz(), hs, teams, estimateInfo());
   const est = estimateInfo();
   app.innerHTML = `<div class="grid2">
@@ -270,7 +290,7 @@ function renderLive() {
     <section class="stack">
       <div class="panel stack"><h2 class="slab">Rangliste</h2><ol class="board">${rows.map(x => `<li class="${x.place === 1 && x.total > 0 ? "first" : ""}"><span class="pl slab">${x.place}.</span><span><b>${esc(x.name)}</b>${x.diff !== undefined ? `<br><span class="hint">Schätzung ${x.diff === Infinity ? "fehlt" : `${+x.diff.toFixed(2)} daneben`}</span>` : ""}</span><span class="pts slab">${x.total}</span></li>`).join("") || `<p class="hint">Noch keine Teams</p>`}</ol>
       ${rows.tiebreak === undefined && rows.filter(x => x.place === 1).length > 1 && rows[0].total > 0 ? `<p class="hint">Gleichstand auf Platz 1. ${est ? (est.answer === null || est.answer === undefined || est.answer === "" ? "Trag im Quiz die Lösung der Schätzfrage ein." : "Die Schätzfrage wurde noch nicht beantwortet.") : "Im Quiz gibt es keine Schätzfrage."}</p>` : ""}</div>
-      <div class="panel stack"><h2 class="slab">Teams (${teams.length})</h2>${teams.map(t => `<div class="row2" style="justify-content:space-between"><span>${esc(t.name)}</span><button data-kick="${esc(t.id)}" aria-label="${esc(t.name)} entfernen">✕</button></div>`).join("") || `<p class="hint">Noch niemand angemeldet.</p>`}</div>
+      <div class="panel stack"><h2 class="slab">Teams (${teams.length})</h2>${teams.map(t => { const d = dupeOf(t); return `<div class="row2" style="justify-content:space-between"><span>${esc(t.name)}${d ? `<br><span class="err">Handy gewechselt? Den Namen gibt es schon.</span>` : ""}</span><span class="row2">${d ? `<button class="main" data-merge="${esc(t.id)}|${esc(d.id)}">Zusammenführen</button>` : ""}<button data-kick="${esc(t.id)}" aria-label="${esc(t.name)} entfernen">✕</button></span></div>`; }).join("") || `<p class="hint">Noch niemand angemeldet.</p>`}</div>
     </section></div>`;
   try { const qr = qrcode(0, "M"); qr.addData(join); qr.make(); $("qr").innerHTML = qr.createSvgTag({ cellSize: 4, margin: 0 }); } catch {}
   if (focus && $(focus)) $(focus).focus();
@@ -278,7 +298,7 @@ function renderLive() {
 
 function gradeHtml(r) {
   if (!teams.length) return `<p class="hint">Noch keine Teams.</p>`;
-  const A = answers[r.id] || {};
+  const A = roundAnswers(r.id);
   const blocks = r.items.map((it, i) => {
     if (!counts(it)) return `<div class="gradeq"><b>${esc(itemLabel(r, i))}</b> <span class="hint">zählt nicht, entscheidet nur das Stechen. Lösung: ${esc(it.answer ?? "–")}</span>${teams.map(t => `<div class="grow"><span>${esc(t.name)}</span><span class="ans${A[t.id]?.[it.id] !== undefined ? " has" : ""}">${esc(A[t.id]?.[it.id] ?? "keine Schätzung")}</span><span></span></div>`).join("")}</div>`;
     return `<div class="gradeq"><b>${esc(itemLabel(r, i))}</b> <span class="hint">${it.type === "music" ? "" : esc(it.text.slice(0, 80))}</span><br><span class="okc">${esc(rightText(it))}</span>
@@ -300,6 +320,7 @@ app.addEventListener("click", async e => {
   if (b.dataset.v) { view = b.dataset.v; return renderLive(); }
   if (b.dataset.rel) { b.disabled = true; await releaseItem(b.dataset.rel); return; }
   if (b.dataset.a2 === "suggest") { applySuggestions(true); return renderLive(); }
+  if (b.dataset.merge) { const [n, o] = b.dataset.merge.split("|"); b.disabled = true; await mergeTeam(n, o); return; }
   if (b.dataset.kick) { if (b.textContent !== "Entfernen?") { b.textContent = "Entfernen?"; return; } await deleteDoc(doc(db, "games", code, "teams", b.dataset.kick)); return; }
   if (b.dataset.mark) {
     const [t, it, s] = b.dataset.mark.split("|"), rid = curRound().id;

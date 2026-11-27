@@ -89,7 +89,8 @@ function fillInputs() {
 }
 
 function boardHtml(rows, hidden = 0) {
-  return `<ol class="board">${rows.map((r, i) => i < hidden ? "" : `<li class="${r.place === 1 && r.total > 0 ? "first" : ""}${r.id === me ? " me" : ""}"><span class="pl slab">${r.place}.</span><span><b>${esc(r.name)}</b>${r.id === me ? " (ihr)" : ""}</span><span class="pts slab">${r.total}</span></li>`).join("")}</ol>`;
+  const mine = game.alias?.[me] || me;
+  return `<ol class="board">${rows.map((r, i) => i < hidden ? "" : `<li class="${r.place === 1 && r.total > 0 ? "first" : ""}${r.id === mine ? " me" : ""}"><span class="pl slab">${r.place}.</span><span><b>${esc(r.name)}</b>${r.id === mine ? " (ihr)" : ""}</span><span class="pts slab">${r.total}</span></li>`).join("")}</ol>`;
 }
 
 function render() {
@@ -99,7 +100,7 @@ function render() {
   if (ph === "lobby") { app.innerHTML = `<div class="panel stack"><h2 class="slab big">Ihr seid dabei!</h2><p>Team <b>${esc(team)}</b> ist angemeldet. Gleich geht's los, die Fragen erscheinen hier automatisch.</p></div>`; return; }
   if (ph === "results" || ph === "final") {
     const rows = game.board || [], hidden = ph === "final" ? Math.max(0, rows.length - (game.reveal || 0)) : 0;
-    const mine = rows.find(r => r.id === me);
+    const mine = rows.find(r => r.id === (game.alias?.[me] || me));
     app.innerHTML = `<div class="stack"><h2 class="slab big">${ph === "final" ? "Siegerehrung" : `Stand nach Runde ${(game.boardRound ?? 0) + 1}`}</h2>
       ${ph === "final" && hidden ? `<p class="hint">Die Plätze werden gerade aufgedeckt…</p>` : mine ? `<p>Ihr seid auf Platz <b>${mine.place}</b> mit <b>${mine.total}</b> Punkten.</p>` : ""}
       ${boardHtml(rows, hidden)}</div>`;
