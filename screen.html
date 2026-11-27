@@ -4,12 +4,12 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Kolties QuizKasten · Beamer</title>
-<script>/* Update-Check: lädt neu, sobald eine neuere Version online ist */const APPV="20261127i";fetch("version.txt?"+Date.now(),{cache:"no-store"}).then(r=>r.ok?r.text():"").then(t=>{t=t.trim();if(t&&t!==APPV){const u=new URL(location.href);if(u.searchParams.get("v")!==t){u.searchParams.set("v",t);location.replace(u)}}}).catch(()=>{});</script>
+<script>/* Update-Check: lädt neu, sobald eine neuere Version online ist */const APPV="20261127j";fetch("version.txt?"+Date.now(),{cache:"no-store"}).then(r=>r.ok?r.text():"").then(t=>{t=t.trim();if(t&&t!==APPV){const u=new URL(location.href);if(u.searchParams.get("v")!==t){u.searchParams.set("v",t);location.replace(u)}}}).catch(()=>{});</script>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bungee&family=Outfit:wght@400;500;600;700&display=swap">
-<link rel="stylesheet" href="css/style.css?v=20261127i">
+<link rel="stylesheet" href="css/style.css?v=20261127j">
 <style>
 html,body{height:100%}
-#s{min-height:100%;display:flex;flex-direction:column;padding:clamp(16px,3vw,48px);gap:clamp(12px,2vw,28px);position:relative;overflow:hidden}
+#s{min-height:100%;display:flex;flex-direction:column;padding:clamp(16px,3vw,48px) clamp(28px,6vw,120px);gap:clamp(12px,2vw,28px);position:relative;overflow:hidden}
 .hd{display:flex;justify-content:space-between;align-items:center;gap:20px;flex-wrap:wrap}
 .rn{font-size:clamp(18px,2vw,30px);color:var(--muted);font-weight:600}
 .qr{background:#fff;padding:12px;border-radius:16px;line-height:0;box-shadow:0 0 0 4px var(--gold),0 0 30px rgba(255,170,40,.5)}
@@ -122,6 +122,6 @@ html,body{height:100%}
 <body>
 <div id="s"><p>Wird geladen…</p></div>
 <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.js"></script>
-<script type="module" src="js/screen.js?v=20261127i"></script>
+<script type="module" src="js/screen.js?v=20261127j"></script>
 </body>
 </html>

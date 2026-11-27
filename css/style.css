@@ -39,7 +39,7 @@ code{color:var(--gold)}
 .logo.big{padding:16px;border-radius:30px;background-size:20px 20px,auto}
 .logo.big .in{padding:10px 30px 14px;border-radius:18px}
 .logo.big .l1{font-size:clamp(16px,2.2vw,30px)}
-.logo.big .l2{font-size:clamp(40px,7vw,104px)}
+.logo.big .l2{font-size:clamp(36px,5.6vw,96px)}
 .logo.sm{padding:8px;border-radius:16px;background-size:12px 12px,auto}
 .logo.sm .in{padding:3px 12px 5px;border-radius:9px}
 .logo.sm .l1{font-size:10px}
