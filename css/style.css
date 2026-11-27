@@ -97,10 +97,11 @@ th{font-size:13px;color:var(--muted);font-weight:600}
 .spot::before{content:"";position:absolute;inset:-10% -20% 0;background:radial-gradient(ellipse 50% 60% at 50% 40%,rgba(160,200,255,.35),transparent 70%);z-index:-1}
 .welcome{display:grid;grid-template-columns:minmax(0,1fr) 150px;gap:8px;align-items:end;overflow:hidden;padding-bottom:0}
 .welcome img{margin-bottom:-18px;width:100%}
-.bubble{background:#fff;color:#07102e;border-radius:16px;padding:10px 14px;font-weight:600;position:relative}
-.bubble::after{content:"";position:absolute;right:-10px;bottom:16px;border:8px solid transparent;border-left-color:#fff}
+.welcome>.bubble,.welcome>.stack{align-self:center;margin:18px 0}
+.bubble{background:#fff;color:#07102e;border-radius:18px;padding:12px 16px;font-weight:600;font-size:15px;line-height:1.35;position:relative;box-shadow:0 8px 24px rgba(0,0,0,.35);text-wrap:pretty}
+.bubble::after{content:"";position:absolute;right:-16px;top:50%;transform:translateY(-50%);border:9px solid transparent;border-left:12px solid #fff}
 /* Team-Emoji, Joker, Bilder, Auflösung */
-.emo{display:grid;grid-template-columns:repeat(auto-fill,minmax(46px,1fr));gap:6px}
+.emo{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:6px}
 .emo button{font-size:24px;padding:0;min-height:46px;background:rgba(255,255,255,.05)}
 .emo button[aria-checked=true]{background:linear-gradient(180deg,#ffd45a,#ff9a10);border-color:#ffe08a;box-shadow:0 0 14px rgba(255,170,40,.5)}
 .joker{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:12px;align-items:center;padding:10px 14px;border-radius:16px;border:1px dashed rgba(255,194,58,.6);background:rgba(255,194,58,.07)}

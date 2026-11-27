@@ -1,5 +1,5 @@
-import { ready, auth, db, signInAnonymously, onAuthStateChanged, doc, getDoc, setDoc, onSnapshot, $, esc, params, until, hydrate } from "./fb.js?v=20261127h";
-import { confetti } from "./fx.js?v=20261127h";
+import { ready, auth, db, signInAnonymously, onAuthStateChanged, doc, getDoc, setDoc, onSnapshot, $, esc, params, until, hydrate } from "./fb.js?v=20261127i";
+import { confetti } from "./fx.js?v=20261127i";
 
 const app = $("app");
 const LS = "pubquiz-team";
@@ -13,7 +13,7 @@ const saved = () => { try { return JSON.parse(localStorage.getItem(LS)) || {}; }
 function joinForm(msg = "") {
   const s = saved();
   let emo = EMO.includes(s.emoji) ? s.emoji : EMO[Math.floor(Math.random() * EMO.length)];
-  app.innerHTML = `<div class="panel welcome" style="margin-bottom:14px"><div class="bubble">Servus! Code vom Beamer eintippen, Teamname dazu, und schon seid ihr im Spiel.</div><img class="host-pic" src="img/kolti-bust.webp" alt="Quizmaster Kolti"></div>
+  app.innerHTML = `<div class="panel welcome" style="margin-bottom:14px"><div class="bubble">Servus! Code vom Beamer und euren Teamnamen eintippen, dann seid ihr dabei.</div><img class="host-pic" src="img/kolti-bust.webp" alt="Quizmaster Kolti"></div>
   <form class="panel stack" id="join">
     <h2 class="slab big">Mitspielen</h2>
     <p class="hint">Ein Handy pro Team reicht.</p>
