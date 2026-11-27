@@ -28,7 +28,7 @@ Teams spielen per Smartphone mit, der Moderator steuert alles vom Laptop, der Be
 ## Word-Format
 
 - `RUNDE 1: Thema` beginnt eine Runde, `MUSIKQUIZ: Thema` eine Musikrunde.
-- Fragen nummeriert (`1.`), Antworten `a)` / `a.`; die **fett** gedruckte gilt als richtig. Fragen ohne Antworten werden freie Fragen.
+- Fragen nummeriert (`1.`), Antworten `a)` / `a.`; die **fett** gedruckte gilt als richtig. Fragen ohne Antworten werden freie Fragen; die richtige Antwort steht darunter in einer Zeile `Antwort: ...`.
 - Musikrunde: eine Zeile pro Lied, `Interpret - Titel` (Reihenfolge egal).
 - Eine Zeile mit `Schätzfrage` markiert die folgende Frage als Schätzfrage für das Stechen.
 

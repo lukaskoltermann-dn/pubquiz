@@ -1,8 +1,10 @@
 // Liest ein Quiz-Skript (Word .docx) ein. Fett gedruckte Antwortoptionen gelten als richtig.
 // Format wie im Beispiel: "RUNDE 1: Titel", nummerierte Fragen, Optionen "a." / "a)", Musikrunde mit "Interpret - Titel".
+// Offene Fragen: ohne Optionen, dafür eine Zeile "Antwort: ..." unter der Frage.
 
 const OPT = /^\s*([a-hA-H])\s*[\.\)]\s*(.*)$/;
 const NUM = /^\s*\d{1,2}\s*[\.\)]\s*(.*)$/;
+const ANS = /^\s*(?:richtige\s+)?antwort\s*:\s*(.+)$/i;
 const HEAD = /^\s*(runde\s*\d+|musik\s*quiz|musikrunde|musik)\b\s*[:\-–]?\s*(.*)$/i;
 
 export const uid = () => Math.random().toString(36).slice(2, 10);
@@ -69,12 +71,14 @@ export function linesToQuiz(lines, title = "Neues Quiz") {
       continue;
     }
     if (/sch[äa]tzfrage/i.test(t) && !/\?\s*$/.test(t)) { finish(); estimateNext = true; continue; }
+    const a = t.match(ANS);
+    if (a && q) { if (q.options.length === 0) q.answer = a[1].trim(); else q.note = (q.note ? q.note + " · " : "") + t; continue; }
     const o = t.match(OPT);
     if (o && q) { q.options.push(o[2].trim()); q._bold.push(b); continue; }
     const n = t.match(NUM);
     if (n) { newQ(n[1].trim()); continue; }
-    if (!q || q.options.length > 0 && /[\?…:]\s*$|\.\.\.\s*$/.test(t) && t.length > 15) { newQ(t); continue; }
-    if (q.options.length === 0) q.text += " " + t;
+    if (!q || (q.options.length > 0 || q.answer !== "") && /[\?…:]\s*$|\.\.\.\s*$/.test(t) && t.length > 15) { newQ(t); continue; }
+    if (q.options.length === 0 && q.answer === "") q.text += " " + t;
     else q.note = (q.note ? q.note + " · " : "") + t;
   }
   finish();
