@@ -1,5 +1,5 @@
-import { ready, auth, db, signInAnonymously, onAuthStateChanged, doc, onSnapshot, $, esc, params, until, hydrate } from "./fb.js?v=20261127l";
-import { confetti } from "./fx.js?v=20261127l";
+import { ready, auth, db, signInAnonymously, onAuthStateChanged, doc, onSnapshot, $, esc, params, until, hydrate } from "./fb.js?v=20261128a";
+import { confetti } from "./fx.js?v=20261128a";
 
 const s = $("s"), code = (params.get("g") || "").toUpperCase();
 let owner = null, game = null, tick = null, animKey = "", solKey = "", partyKey = "";

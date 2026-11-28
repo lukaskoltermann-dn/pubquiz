@@ -35,6 +35,7 @@ Im Quiz-Editor oben „Generalprobe“: prüft alle Bilder automatisch, warnt be
 - **Team-Emoji:** Teams wählen beim Beitreten ein Emoji, es steht vor dem Namen.
 - **Joker:** Jedes Team kann einmal pro Abend während der Antwortzeit den Joker setzen. Die Fragenpunkte dieser Runde zählen doppelt (Rundenbonus nicht).
 - **Antwortzeit:** Der Beamer zeigt „X von Y Teams haben geantwortet“. In den letzten 10 Sekunden wird der Countdown riesig, danach ertönt ein Gong.
+- **Pausenmusik:** Während der Antwortzeit läuft eine leise Quizshow-Musik vom Moderations-Laptop. In der letzten Minute wird sie spannender, 12 Sekunden vor Schluss blendet sie aus (dann ticken die Show-Sounds und der Gong kommt). Sie läuft genau so lang wie die eingestellte Zeit, pausiert während ein Spotify-Song läuft und ist oben rechts an-/ausschaltbar mit Lautstärkeregler.
 - **Show-Sounds** (Ticken, Gong, Trommelwirbel, Fanfare) kommen aus dem Moderations-Laptop. Oben rechts an- und ausschaltbar.
 - **Bilder:** Im Editor pro Frage ein Bild hochladen oder einen Bild-Link einfügen. Bilder im Word-Dokument direkt unter der Frage werden beim Import übernommen. Bilder erscheinen auf Beamer und Handys.
 

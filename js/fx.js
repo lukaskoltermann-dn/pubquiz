@@ -75,3 +75,57 @@ export function confetti(ms = 7000) {
     if (el < ms) requestAnimationFrame(frame); else c.remove();
   })(t0);
 }
+
+// ---------- Pausenmusik: leiser Quizshow-Loop während der Antwortzeit ----------
+let mOn = localStorage.getItem("pq-music") !== "0", mVol = +(localStorage.getItem("pq-mvol") || .5);
+let mGain = null, mTimer = null, mNext = 0, mStep = 0, mPlaying = false, mTension = false, mStopAt = 0;
+export const musicOn = () => mOn;
+export const musicVol = () => mVol;
+export function setMusic(v) { mOn = v; try { localStorage.setItem("pq-music", v ? "1" : "0"); } catch {} if (!v) musicStop(); }
+export function setMusicVol(v) { mVol = v; try { localStorage.setItem("pq-mvol", String(v)); } catch {} if (mGain && mPlaying) mGain.gain.setTargetAtTime(v * .55, ac.currentTime, .1); }
+const BPM = 108, E8 = 60 / BPM / 2;
+// Am | F | Dm | E  (Bass-Grundton, Akkordtöne)
+const PROG = [[110, [220, 261.6, 329.6]], [87.31, [174.6, 220, 261.6]], [73.42, [146.8, 174.6, 220]], [82.41, [164.8, 207.7, 246.9]]];
+function mt(f, t, dur, type, vol, lp) {
+  const o = ac.createOscillator(), g = ac.createGain(); o.type = type; o.frequency.value = f;
+  g.gain.setValueAtTime(.0001, t); g.gain.exponentialRampToValueAtTime(vol, t + .008); g.gain.exponentialRampToValueAtTime(.0001, t + dur);
+  let n = o; if (lp) { const fl = ac.createBiquadFilter(); fl.type = "lowpass"; fl.frequency.value = lp; o.connect(fl); n = fl; }
+  n.connect(g).connect(mGain); o.start(t); o.stop(t + dur + .05);
+}
+function mh(t, vol, dur = .035) {
+  const s = ac.createBufferSource(), f = ac.createBiquadFilter(), g = ac.createGain();
+  s.buffer = nbuf; s.loop = true; s.loopStart = Math.random() * .5; f.type = "highpass"; f.frequency.value = 7000;
+  g.gain.setValueAtTime(.0001, t); g.gain.exponentialRampToValueAtTime(vol, t + .003); g.gain.exponentialRampToValueAtTime(.0001, t + dur);
+  s.connect(f).connect(g).connect(mGain); s.start(t, Math.random() * .5); s.stop(t + dur + .02);
+}
+function rnd(n) { const x = Math.sin(n * 12.9898) * 43758.5453; return x - Math.floor(x); }
+function beat(step, t) {
+  const e = step % 8, bar = Math.floor(step / 8), [root, ch] = PROG[bar % 4];
+  if (e === 0 || e === 3 || e === 6) mt(root, t, E8 * 2.2, "triangle", .32, 700);          // Bass im Tresillo-Rhythmus
+  if (e === 2 || e === 6) ch.forEach(f => mt(f, t, .13, "square", .028, 1500));            // kurze Akkord-Stöße
+  mh(t, e % 2 ? .035 : .018);                                                               // Hi-Hat
+  if (mTension) mh(t + E8 / 2, .02);                                                         // letzte Minute: schnelleres Ticken
+  if ([1, 4, 5, 7].includes(e) && rnd(step) > .45) mt(ch[Math.floor(rnd(step + 99) * 3)] * 2, t, .28, "triangle", .05);  // Glöckchen-Melodie
+  if (mTension && e % 2 === 0) mt(ch[2] * 4, t, .06, "sine", .025);                          // Spannungs-Puls
+}
+function musicStart() {
+  if (mPlaying) return;
+  mGain = ac.createGain(); mGain.gain.value = .0001; mGain.connect(out);
+  mGain.gain.setTargetAtTime(mVol * .55, ac.currentTime, .8);
+  mPlaying = true; mStep = 0; mNext = ac.currentTime + .1; mStopAt = 0;
+  mTimer = setInterval(() => { while (mNext < ac.currentTime + .3) { beat(mStep++, mNext); mNext += E8; } }, 60);
+}
+export function musicStop(fade = .8) {
+  if (!mPlaying) return;
+  mPlaying = false; const g = mGain, tm = mTimer;
+  try { g.gain.setTargetAtTime(.0001, ac.currentTime, fade / 3); } catch {}
+  setTimeout(() => { clearInterval(tm); try { g.disconnect(); } catch {} }, fade * 1000 + 400);
+}
+// Wird laufend mit der Restzeit aufgerufen: startet, steigert in der letzten Minute, blendet vor dem Countdown aus
+export function musicUpdate(left, hold = false) {
+  const can = mOn && ac && ac.state === "running";
+  if (!can || hold || left <= 12000) { musicStop(left <= 12000 ? 2.5 : .8); return; }
+  mTension = left < 60000;
+  musicStart();
+}
+export const musicPlaying = () => mPlaying;

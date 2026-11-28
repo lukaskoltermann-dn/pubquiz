@@ -1,7 +1,7 @@
-import { ready, auth, db, signInWithEmailAndPassword, signOut, onAuthStateChanged, doc, getDoc, setDoc, updateDoc, deleteDoc, onSnapshot, collection, getDocs, $, esc, keepEmu, until, hydrate, imgSrc } from "./fb.js?v=20261127l";
-import * as fx from "./fx.js?v=20261127l";
-import { docxToQuiz, uid } from "./importer.js?v=20261127l";
-import { slots, counts, suggest, answerText, rightText, roundPoints, total, ranking } from "./scoring.js?v=20261127l";
+import { ready, auth, db, signInWithEmailAndPassword, signOut, onAuthStateChanged, doc, getDoc, setDoc, updateDoc, deleteDoc, onSnapshot, collection, getDocs, $, esc, keepEmu, until, hydrate, imgSrc } from "./fb.js?v=20261128a";
+import * as fx from "./fx.js?v=20261128a";
+import { docxToQuiz, uid } from "./importer.js?v=20261128a";
+import { slots, counts, suggest, answerText, rightText, roundPoints, total, ranking } from "./scoring.js?v=20261128a";
 
 const app = $("app");
 const toast = m => { const t = $("toast"); t.textContent = m; t.style.display = "block"; clearTimeout(toast.t); toast.t = setTimeout(() => t.style.display = "none", 3500); };
@@ -270,7 +270,7 @@ async function startGame(q) {
   editing = null; openLive(c);
 }
 
-function stopLive() { subs.forEach(u => u()); subs = []; clearInterval(tick); code = null; game = null; hs = null; }
+function stopLive() { fx.musicStop(); subs.forEach(u => u()); subs = []; clearInterval(tick); code = null; game = null; hs = null; }
 
 async function openLive(c) {
   stopLive(); code = c; teams = []; allTeams = []; raw = {};
@@ -290,7 +290,8 @@ async function openLive(c) {
     syncLive(); renderLive();
   }));
   tick = setInterval(() => {
-    const t = $("htimer"); if (!game?.deadline || game.phase !== "answering") return;
+    const t = $("htimer"); if (!game?.deadline || game.phase !== "answering") { fx.musicStop(); return; }
+    fx.musicUpdate(game.deadline - Date.now(), !!spWant); // Pausenmusik, pausiert während ein Song läuft
     const l = game.deadline - Date.now(); if (t) t.textContent = l > 0 ? until(l) : "Zeit um";
     // letzte 10 Sekunden ticken, dann Gong
     const sec = Math.ceil(l / 1000);
@@ -474,8 +475,12 @@ function renderLive() {
   const focus = document.activeElement?.id;
   const r = curRound(), ph = game.phase, last = game.roundIdx >= quiz().rounds.length - 1;
   const join = location.origin + location.pathname.replace(/host\.html$/, "") + `?g=${code}`;
-  $("topacts").innerHTML = `<button id="fxb" aria-pressed="${fx.fxOn()}" title="Gong, Ticken, Trommelwirbel und Fanfare">${fx.fxOn() ? "🔊 Show-Sounds an" : "🔇 Show-Sounds aus"}</button><a href="${esc(keepEmu(`screen.html?g=${code}`))}" target="_blank"><button class="main">Beamer öffnen</button></a><button id="endb">Abend beenden</button>`;
+  const topHtml = `<button id="mub" aria-pressed="${fx.musicOn()}" title="Leise Quizshow-Musik während der Antwortzeit">${fx.musicOn() ? "🎵 Pausenmusik an" : "🎵 Pausenmusik aus"}</button>${fx.musicOn() ? `<input id="muv" type="range" min="0.1" max="1" step="0.05" aria-label="Lautstärke Pausenmusik" style="width:90px;min-height:0;padding:0;accent-color:#ffc23a">` : ""}<button id="fxb" aria-pressed="${fx.fxOn()}" title="Gong, Ticken, Trommelwirbel und Fanfare">${fx.fxOn() ? "🔊 Show-Sounds an" : "🔇 Show-Sounds aus"}</button><a href="${esc(keepEmu(`screen.html?g=${code}`))}" target="_blank"><button class="main">Beamer öffnen</button></a><button id="endb">Abend beenden</button>`;
+  if ($("topacts").dataset.h !== topHtml || !$("mub")) { $("topacts").innerHTML = topHtml; $("topacts").dataset.h = topHtml; }
   $("fxb").onclick = () => { fx.setFx(!fx.fxOn()); fx.unlock(); renderLive(); };
+  $("mub").onclick = () => { fx.setMusic(!fx.musicOn()); fx.unlock(); renderLive(); };
+  if ($("muv") && document.activeElement !== $("muv")) $("muv").value = fx.musicVol();
+  $("muv") && ($("muv").oninput = e => fx.setMusicVol(+e.target.value));
   $("endb").onclick = () => { if ($("endb").textContent === "Wirklich beenden?") act("end"); else $("endb").textContent = "Wirklich beenden?"; };
 
   let ctrl = "";
